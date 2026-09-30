@@ -56,6 +56,13 @@ export const NAV: NavEntry[] = [
     group: "资产",
   },
   {
+    href: "/guardrail",
+    label: "门禁演示",
+    subtitle: "红绿灯并排：拦截与放行对比",
+    icon: IconShield,
+    group: "审计",
+  },
+  {
     href: "/intercepts",
     label: "本金保护",
     subtitle: "门禁帮你避免的损失",

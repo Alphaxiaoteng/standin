@@ -110,6 +110,15 @@ export default function Home() {
         desc="AI 员工今天赚了多少、花了多少。数据全部来自落盘账本，亏损单如实显示。"
       />
 
+      {/* 显著 CTA：门禁红绿灯演示 */}
+      <Link
+        href="/guardrail"
+        className="btn btn-primary"
+        style={{ alignSelf: "flex-start", marginBottom: 4 }}
+      >
+        <IconShield size={14} /> 打开门禁红绿灯演示
+      </Link>
+
       {/* 顶部三个核心指标（PRD §五：收入、成本、净利） */}
       <div className="summary">
         <div className="summary-item">
