@@ -5,7 +5,7 @@ import { Card, CopyBlock } from "../components/ui";
 import { CANONICAL, EXPLORER } from "../../lib/chain";
 
 const API_ENDPOINTS: { method: string; path: string; desc: string }[] = [
-  { method: "GET", path: "/api/stats", desc: "返回今日支出、拦截数、金库余额" },
+  { method: "GET", path: "/api/stats", desc: "返回今日支出、拦截数、本地账本余额" },
   { method: "GET", path: "/api/policies", desc: "返回全部支出策略" },
   {
     method: "POST",

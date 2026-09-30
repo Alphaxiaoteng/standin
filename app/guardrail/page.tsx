@@ -87,7 +87,7 @@ export default function GuardrailPage() {
         {/* 左：红灯 · 拦截 */}
         <Card
           title="红灯 · 拦截"
-          desc="声明与实际不一致，金库拒绝放款，本金分毫未动"
+          desc="声明与实际不一致，门禁拒绝放款，本金分毫未动"
           actions={<Badge tone="danger">INTERCEPTED</Badge>}
           flush
         >
@@ -116,7 +116,7 @@ export default function GuardrailPage() {
         {/* 右：绿灯 · 放行 */}
         <Card
           title="绿灯 · 放行"
-          desc="逐字段一致，金库按声明意图放款"
+          desc="逐字段一致，门禁按声明意图放行"
           actions={<Badge tone="success">EXECUTED</Badge>}
           flush
         >

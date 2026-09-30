@@ -88,7 +88,7 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
                 <div className="tl-meta">
                   <span>{who.hint}</span>
                   <span className="tl-hash">
-                    交易 {truncateHash(t.txHash, 8, 6)}
+                    流水 {truncateHash(t.txHash, 8, 6)}
                     <Copy text={t.txHash} />
                   </span>
                 </div>

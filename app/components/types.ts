@@ -8,7 +8,7 @@ export interface Stats {
   todaySpent: number;
   /** 累计拦截次数 */
   interceptCount: number;
-  /** 金库余额（USDC） */
+  /** 本地账本余额（USDC，非链上金库） */
   walletBalance: number;
 }
 

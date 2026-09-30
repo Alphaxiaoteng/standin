@@ -19,7 +19,8 @@ export interface TaskExecutionSummary {
 
 /**
  * 彩排报告哈希：keccak256(任务标识 + 声明意图 + 实际 calldata)。
- * 该哈希会被 StandInAnchor 合约锚定上链，因此必须是真实 keccak256，
+ * 设计上该哈希将由 StandInAnchor 合约锚定（合约已通过 forge test，尚未部署），
+ * 因此必须是真实 keccak256，
  * 而不是可碰撞的 32 位近似值——否则两个不同的彩排结果可能产生同一哈希。
  */
 export function generateReportHash(taskId: string, intent: Intent, calldata: CalldataParams): `0x${string}` {

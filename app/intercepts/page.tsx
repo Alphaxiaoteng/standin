@@ -125,8 +125,9 @@ export default function InterceptsPage() {
 
       <div className="notice">
         <span>
-          每次拦截都生成彩排报告并锚定到 StandInAnchor
-          合约。测试网测试币没有价值，这里量化的"避免损失"只证明保护机制真实生效，不构成投资建议。
+          每次拦截都会生成彩排报告并写入本地账本。`StandInAnchor` 合约源码已就绪并通过
+          合约测试，但**尚未部署**，因此这里的记录是链下账本，不是链上证明。测试网测试币没有价值，
+          这里量化的"避免损失"只证明保护机制真实生效，不构成投资建议。
         </span>
       </div>
     </div>

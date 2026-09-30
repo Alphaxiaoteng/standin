@@ -38,7 +38,7 @@ describe("guardrail 红绿灯：绿灯放行分支", () => {
     expect(r!.reasons).toHaveLength(0);
   });
 
-  it("放行记录同时带本地报告哈希与测试网流水号，二者是不同字段", () => {
+  it("放行记录同时带本地报告哈希与本地流水号，二者是不同字段", () => {
     const out = runScenario("allowed");
 
     expect(out.summary.reportHash).toMatch(/^0x[0-9a-f]{64}$/);
@@ -46,7 +46,7 @@ describe("guardrail 红绿灯：绿灯放行分支", () => {
     const tx = listTransactions().find((t) => t.id === out.transactionId);
     expect(tx).toBeDefined();
     expect(tx!.reportHash).toBe(out.summary.reportHash);
-    // txHash 与 reportHash 来源不同：测试网广播流水号 ≠ 彩排报告锚定哈希
+    // txHash 与 reportHash 来源不同：本地流水号 ≠ 彩排报告哈希（均不广播）
     expect(tx!.txHash).toMatch(/^0x[0-9a-f]{64}$/);
     expect(tx!.txHash).not.toBe(tx!.reportHash);
   });

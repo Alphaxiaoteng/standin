@@ -84,7 +84,7 @@ export default function WalletPage() {
       )}
 
       <div className="grid grid-3">
-        <Card title="经营本金" desc="Agent 可支配的最大金库余额">
+        <Card title="经营本金" desc="Agent 可支配的最大余额（本地账本）">
           {stats === null ? (
             <Loading rows={2} />
           ) : (

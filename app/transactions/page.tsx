@@ -6,7 +6,6 @@ import { fetchTransactions } from "../components/api";
 import type { Transaction } from "../components/types";
 import { formatAmount, formatTime, statusLabel, statusTone } from "../components/format";
 import { Badge, Card, DataState, DataTable, Hash } from "../components/ui";
-import { EXPLORER } from "../../lib/chain";
 
 export default function TransactionsPage() {
   const [items, setItems] = useState<Transaction[] | null>(null);
@@ -25,7 +24,7 @@ export default function TransactionsPage() {
     <div className="stack">
       <PageHead
         title="交易流水"
-        desc="通过彩排门禁并成功放款的结算记录。被拦截的请求不会在此出现，请前往拦截记录查看。"
+        desc="通过彩排门禁并成功放款的结算记录（本地账本）。被拦截的请求不会在此出现，请前往拦截记录查看。"
       />
 
       <Card title="全部流水" desc="按时间倒序" flush>
@@ -35,7 +34,7 @@ export default function TransactionsPage() {
           emptyHint="Agent 成功放行一笔支付后，这里会出现记录"
         >
           {(list) => (
-            <DataTable head={["时间", "收款方", "金额", "状态", "交易哈希", "关联报告"]}>
+            <DataTable head={["时间", "收款方", "金额", "状态", "本地流水号", "彩排报告哈希"]}>
               {list.map((tx) => (
                 <tr key={tx.id}>
                   <td className="mono">{formatTime(tx.ts)}</td>
@@ -50,13 +49,7 @@ export default function TransactionsPage() {
                     <Badge tone={statusTone(tx.status)}>{statusLabel(tx.status)}</Badge>
                   </td>
                   <td>
-                    <a
-                      href={`${EXPLORER}/tx/${tx.txHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <Hash value={tx.txHash} head={10} tail={8} />
-                    </a>
+                    <Hash value={tx.txHash} head={10} tail={8} />
                   </td>
                   <td>
                     <Hash value={tx.reportHash} head={10} tail={8} />

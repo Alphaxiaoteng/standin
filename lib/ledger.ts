@@ -36,7 +36,7 @@ export interface TransactionRecord {
   amount: number;
   token: string;
   status: "EXECUTED";
-  /** 测试网交易哈希（演示用伪哈希） */
+  /** 本地流水号（非链上哈希：不广播任何交易） */
   txHash: string;
   reportHash: string;
 }
@@ -83,7 +83,7 @@ export interface Stats {
   todaySpent: number;
   /** 累计拦截次数 */
   interceptCount: number;
-  /** 金库余额（USDC） */
+  /** 本地账本余额（USDC，非链上金库） */
   walletBalance: number;
 }
 

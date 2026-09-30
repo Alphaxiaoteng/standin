@@ -3,7 +3,7 @@
  *
  *   BountiesPort  → lib/market/bounties（开放悬赏）
  *   HealthPort    → lib/market/health（真实滑动窗口健康度）
- *   WalletPort    → lib/ledger（金库余额 / recordSpend）
+ *   WalletPort    → lib/ledger（本地账本余额 / recordSpend）
  *   LedgerPort    → lib/ledger.settle（写失败抛错 → sop 走回滚停机分支）
  *   ExecutorPort  → lib/market/sources（CoinGecko/Coinbase/HN 真实抓取，
  *                    并把每次调用回写健康度）

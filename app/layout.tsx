@@ -6,7 +6,7 @@ import Topbar from "./components/Topbar";
 export const metadata: Metadata = {
   title: "StandIn · Agent 支付护栏控制台",
   description:
-    "为 AI Agent 提供带护栏的钱包：每笔支付先彩排，声明意图与实际 calldata 一致才允许金库放款。",
+    "为 AI Agent 提供带护栏的钱包：每笔支付先彩排，声明意图与实际 calldata 一致才允许放款。",
 };
 
 export default function RootLayout({
