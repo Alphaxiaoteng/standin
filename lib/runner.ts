@@ -1,3 +1,4 @@
+import { keccak256, toHex } from "viem";
 import { compareIntent, Intent, CalldataParams, RehearsalResult } from "./rehearse";
 
 export interface AgentTask {
@@ -17,18 +18,13 @@ export interface TaskExecutionSummary {
 }
 
 /**
- * 模拟生成报告 Hash
+ * 彩排报告哈希：keccak256(任务标识 + 声明意图 + 实际 calldata)。
+ * 该哈希会被 StandInAnchor 合约锚定上链，因此必须是真实 keccak256，
+ * 而不是可碰撞的 32 位近似值——否则两个不同的彩排结果可能产生同一哈希。
  */
 export function generateReportHash(taskId: string, intent: Intent, calldata: CalldataParams): `0x${string}` {
-  // 简易稳定 Hash，模拟 keccak256
   const raw = `${taskId}:${intent.action}:${intent.to}:${intent.amount}:${calldata.action}:${calldata.to}:${calldata.amount}`;
-  let hash = 0;
-  for (let i = 0; i < raw.length; i++) {
-    hash = (hash << 5) - hash + raw.charCodeAt(i);
-    hash |= 0;
-  }
-  const hex = Math.abs(hash).toString(16).padStart(64, "0");
-  return `0x${hex}`;
+  return keccak256(toHex(raw));
 }
 
 /**
