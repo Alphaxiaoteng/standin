@@ -46,7 +46,7 @@
 | 产出 | 可核实锚点 |
 |---|---|
 | 首页三数（收入 / 成本 / 净利，含负值）+ 时间轴流水，数据全部来自真实账本 | `app/page.tsx`；API `app/api/earnings/report/route.ts`（无数据返回 503，绝不编造） |
-| 一键跑剧本的门禁演示页（红绿灯 + 逐字段比对并排展示） | `/guardrail` → `app/guardrail/page.tsx`、`app/components/IntentDiff.tsx`、`app/components/RunConsole.tsx`；POST `app/api/agent/run/route.ts` |
+| 一键跑剧本的门禁演示页（红绿灯 + 逐字段比对并排展示） | `/guardrail` → `app/guardrail/page.tsx`、`app/components/IntentDiff.tsx`、`app/components/api.ts`；POST `app/api/agent/run/route.ts` |
 | 本金保护页：顶部「累计避免损失」，每条写明若放行将损失多少 | `/intercepts` → `app/intercepts/page.tsx` |
 | 机会与决策页：候选 / 选中 / 放弃理由 / 预算占用，止损触发时提示条接管 | `/opportunities` → `app/opportunities/page.tsx`；`lib/agent/select.ts` `rejectionReasons()` |
 | 悬赏市场页：内置买方标 `DEMO BUYER`，第三方发布标「第三方悬赏」 | `/bounties` → `app/bounties/page.tsx`；`lib/market/bounties.ts` `DEMO_BUYERS` |

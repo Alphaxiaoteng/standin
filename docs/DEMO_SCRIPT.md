@@ -71,11 +71,11 @@
 - **画面**：切到终端，真实运行两条命令并停在结果；再切到合约源码目录与合约测试输出。
 - **屏幕动线**（终端，逐条回车后硬跳切到输出）：
   1. `pnpm vitest run` → 末行停在 **153 passed / 16 files**。
-  2. `pnpm build` → 末行 exit 0，路由清单停在 **11 个页面 + 10 个 API 路由**。
+  2. `pnpm build` → 末行 exit 0，路由清单停在 **9 个业务页面 + 11 个 API 路由**。
   3. 展示合约源码目录 `contracts/src/`（StandInAnchor、PaymentVault）与通过测试 `forge test` → **4 passed**。**不要展示 broadcast 目录作为「部署证明」——该记录未广播。**
   4. 屏幕列出：合约源码 `contracts/src/`（StandInAnchor 锚定报告哈希、PaymentVault 托管本金）、合约测试 `forge test` 4 passed；数据源 CoinGecko / Coinbase / Hacker News；账本落盘带回滚。**不列合约地址，避免暗示已部署。**
 - **旁白**（字数≈92）：
-  > 底层不是空壳。153 个单元与端到端测试全绿，11 个页面 10 个接口一次构建通过；两个合约——锚定彩排报告的 StandInAnchor 和托管本金的 PaymentVault——源码就绪，合约测试 4 项全过，**尚未部署到测试网**，我们不为没上链的东西邀功。行情和热点来自 CoinGecko、Coinbase、Hacker News 三个真实源，账本落盘、写失败会回滚并停机。
+  > 底层不是空壳。153 个单元与端到端测试全绿，9 个业务页面 11 个接口一次构建通过；两个合约——锚定彩排报告的 StandInAnchor 和托管本金的 PaymentVault——源码就绪，合约测试 4 项全过，**尚未部署到测试网**，我们不为没上链的东西邀功。行情和热点来自 CoinGecko、Coinbase、Hacker News 三个真实源，账本落盘、写失败会回滚并停机。
 - **要点**：命令要**现场真跑**（或用刚跑完的真实输出画面），不摆拍、不伪造测试数。
 
 ### 镜头 8 · 2:52–3:08（16s）局限声明 + 收尾

@@ -6,7 +6,7 @@
 
 本仓库当前可核验的硬事实：
 - 测试：`pnpm vitest run` → 153 passed / 16 files。
-- 构建：`pnpm build` → exit 0，11 页面 + 10 API 路由。
+- 构建：`pnpm build` → exit 0，9 业务页面 + 11 API 路由。
 - 合约源码（`contracts/src/`）：`StandInAnchor`（锚定彩排报告哈希 + 放行/拦截裁决）、`PaymentVault`（策略限额内托管本金）。**尚未部署到 Monad testnet** —— 2026-10-01 用 `eth_getCode` 查官方 RPC，两个计划地址（`0xdebc4e…452e` / `0x55446e…3ee6`）均返回空字节码；`contracts/broadcast/` 内 `hash: null`、`receipts: []`，从未广播。
 - 合约测试：`cd contracts && forge test` → **4 passed**（访问控制 / 周期轮转 / 放行成功 / 流氓 Agent 被拦截）。这是当前可主张的最强证明；部署完成前不主张任何链上证据。
 
