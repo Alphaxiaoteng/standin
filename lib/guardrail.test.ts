@@ -12,20 +12,8 @@ import {
   listTransactions,
   resetStore,
 } from "./store";
-import type { InterceptRecord, RehearsalRecord } from "./ledger";
+import { deriveAvoidedLoss } from "./agent/avoidedLoss";
 import { TEST_ADDRESSES } from "./scenarios";
-
-/** 与 app/api/intercepts/route.ts 相同的第一优先级口径：声明意图金额（人类单位） */
-function deriveAvoidedLoss(it: InterceptRecord, rehearsals: RehearsalRecord[]): number | null {
-  const r = rehearsals.find((x) => x.taskId === it.taskId);
-  const declaredUsdc = r?.declaredIntent.amountUsdc ?? null;
-  if (declaredUsdc !== null && declaredUsdc > 0) return declaredUsdc;
-  const m = /declared (\d+(?:\.\d+)?)/.exec(it.reason);
-  if (!m) return null;
-  const raw = Number(m[1]);
-  if (!Number.isFinite(raw) || raw <= 0) return null;
-  return Number((raw / 1e6).toFixed(6));
-}
 
 beforeEach(() => {
   resetStore();
