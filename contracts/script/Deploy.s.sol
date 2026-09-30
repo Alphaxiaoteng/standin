@@ -7,7 +7,8 @@ import "../src/PaymentVault.sol";
 
 contract Deploy is Script {
     function run() external {
-        uint256 deployerKey = vm.envOr("MONAD_PK", uint256(0x8da690d1d4d878cab206664f9d1f054e574541594cfa45aa1de6f0c65e7bed25));
+        // 私钥只能来自环境变量，绝不写入源码或提交进仓库。
+        uint256 deployerKey = vm.envUint("MONAD_PK");
         vm.startBroadcast(deployerKey);
 
         StandInAnchor anchor = new StandInAnchor();
