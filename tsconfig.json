@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
+    "target": "ES2022",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
@@ -30,5 +30,13 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "**/*.test.ts",
+    "lib/long-running-app-harness",
+    "lib/cluster",
+    "lib/security",
+    "lib/utils",
+    "lib/monitoring"
+  ]
 }

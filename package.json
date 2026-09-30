@@ -9,9 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "better-sqlite3": "^13.0.3",
     "next": "16.3.6",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "viem": "^2.56.9"
   },
   "devDependencies": {
     "@types/node": "^20",
@@ -19,7 +21,8 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.2"
   },
   "packageManager": "pnpm@11.22.0"
 }

@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local storage
+/.data/
+
+# foundry build artifacts (broadcast/ is kept: it is the deployment proof)
+contracts/out/
+contracts/cache/
+contracts/lib/openzeppelin-contracts/
+contracts/lib/forge-std/
+
+# harness runtime artifacts
+.agents/runtime/
