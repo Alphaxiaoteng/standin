@@ -51,3 +51,9 @@ contracts/lib/forge-std/
 
 # harness runtime artifacts
 .agents/runtime/
+
+# unrelated scaffolding not part of the submission (self-contained, not imported
+# by app/ or lib/agent; excluded from vitest)
+lib/long-running-app-harness/
+lib/cluster/
+lib/monitoring/
