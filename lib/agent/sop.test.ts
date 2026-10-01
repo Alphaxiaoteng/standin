@@ -361,6 +361,23 @@ describe("runSopTick spread_watch 通知回放（验收只认独立通知存储�
     expect(res.ok).toBe(false);
     expect(res.task.failReason).toContain("未按时通知");
   });
+
+  it("passes with the executor-reported sampling window (回归：样本早于交付时刻)", async () => {
+    // live 验证发现：验收窗口曾固定为 [deliveredAt, deliveredAt]，
+    // 而采样都在执行期间 → 真实环境永远"未超过阈值"。
+    const rig = spreadRig({
+      ok: true,
+      samples: [{ spreadBps: 80, at: NOW - 20_000 }],
+      notifiedAt: NOW - 15_000,
+      windowStart: NOW - 30_000,
+      windowEnd: NOW - 1_000,
+    });
+    rig.deps.notices = { latestFor: (id) => (id === "bnty-sp" ? { at: NOW - 15_000 } : null) };
+
+    const res = await runSopTick(spreadReq, rig.deps);
+    expect(res.ok).toBe(true);
+    expect(res.task.status).toBe("passed");
+  });
 });
 
 describe("runSopTick 结算证据（漏洞 C：收入必须有链上证据）", () => {

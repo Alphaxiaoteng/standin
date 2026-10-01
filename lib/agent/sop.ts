@@ -76,6 +76,9 @@ export interface ExecuteResult {
   snapshot?: BriefSnapshot;
   samples?: SpreadSample[];
   notifiedAt?: number | null;
+  /** 实际采样窗口（毫秒时刻）：验收按它判定越线与通知，而不是交付时刻 */
+  windowStart?: number;
+  windowEnd?: number;
   error?: string;
 }
 
@@ -256,8 +259,10 @@ function verifyChecks(
   const verdict = verifySpreadWatch({
     samples: ex.samples ?? [],
     thresholdBps: toleranceBps ?? MAX_SPREAD_BPS,
-    windowStart: deliveredAt - 0,
-    windowEnd: deliveredAt,
+    // 采样发生在执行期间（早于交付时刻）；窗口用执行器回报的真实采样窗口，
+    // 否则 spread_watch 会因"样本全在窗口外"而永远判负（live 验证发现）
+    windowStart: ex.windowStart ?? deliveredAt,
+    windowEnd: ex.windowEnd ?? deliveredAt,
     notifiedAt,
   });
   return { verdict, checks: spreadWatchChecks(ex, toleranceBps, deliveredAt, notifiedAt) };

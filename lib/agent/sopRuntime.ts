@@ -259,7 +259,8 @@ const executor = {
         await delay(Math.max(2_000, Math.floor(windowMs / 6)));
       }
     }
-    return { ok: true as const, samples, notifiedAt };
+    // 回报真实采样窗口：验收按它判定越线与通知（样本都在窗口内）
+    return { ok: true as const, samples, notifiedAt, windowStart: started, windowEnd: Date.now() };
   },
 };
 
