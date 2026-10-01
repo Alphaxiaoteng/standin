@@ -72,13 +72,13 @@
 |---|---|---|
 | 项目名与 Tagline | 已完成 | 本文档顶部 |
 | 方案介绍与 Why Monad | 已完成（见本文档 §三） | 高吞吐低成本的 EVM 测试网让「每笔彩排报告都先比对意图再放款」在演示规模下可行。**注意：合约尚未部署，不要引用 `contracts/broadcast/` 作为已部署地址来源** |
-| Demo 视频（2-3 分钟） | **待完成** | 按 §一.3 的复现路径录制：首页 → 三个剧本 → 拦截留痕 → 验收与亏损单 |
-| Live Demo URL | **待完成** | 当前仅本地 `pnpm dev`；需部署（仓库内尚无部署配置产出物） |
-| 代码仓库（公开） | **待完成** | 本地 git 完整（HEAD `143f0cd`，`git log` 可查）；`git remote -v` 为空，尚未推送 |
+| Demo 视频（2-3 分钟） | **待完成** | 按 `docs/DEMO_SCRIPT.md`（3:08 逐镜脚本）录制；**官方规则禁止 AI 合成语音，必须真人解说** |
+| Live Demo URL | **待完成** | 仓库已含完整 Next.js 生产构建（`pnpm build` exit 0）；需登录 Vercel/Railway 一键部署（CLI 已装但无凭据，见阻塞项） |
+| 代码仓库（公开） | ✅ 已完成 | https://github.com/Alphaxiaoteng/standin （public，20 commit 全量增量历史，评委可逐条核验六周内构建） |
 | 部署证明与交易哈希 | **未完成** | 无链上证明。`contracts/broadcast/...run-latest.json` 内 `hash: null`、`receipts: []`（从未广播）；2026-10-01 `eth_getCode` 查官方 RPC，两个计划地址均返回 `0x`。可主张的是合约源码 + `forge test` 4 passed |
 | 测试与构建快照 | 已完成 | `pnpm vitest run` 153 passed / 16 files；`cd contracts && forge test` 4 passed；`pnpm build` exit 0 |
 
-**立即待办（按优先级）**：① 重新部署两合约并回填真实 tx 哈希；② 推送公开仓库；③ 部署 Live Demo；④ 录制 2-3 分钟视频。
+**立即待办（按优先级）**：① 领测试币并部署两合约（水龙头全部需要浏览器人机验证，CLI 程序化领取已证实不可行——Alchemy 返回 `CAPTCHA verification is required / no server-to-server credential`）；② 部署 Live Demo（`npx vercel login` 后 `npx vercel deploy --prod`）；③ 按 `docs/DEMO_SCRIPT.md` 录制真人解说视频；④ 合约上链后回填真实 tx 哈希。
 
 ---
 
