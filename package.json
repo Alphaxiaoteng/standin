@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:core": "vitest run lib/agent lib/market lib/ledger.test.ts lib/guardrail.test.ts lib/e2e.test.ts"
   },
   "dependencies": {
     "next": "16.3.6",

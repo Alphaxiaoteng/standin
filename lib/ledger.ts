@@ -214,6 +214,10 @@ export function toDateKey(ts: number = Date.now()): string {
 }
 
 export function defaultStoragePath(): string {
+  // 测试隔离：优先环境变量注入，避免测试写真实 .data/
+  if (process.env.STANDIN_LEDGER_PATH) {
+    return resolve(process.env.STANDIN_LEDGER_PATH);
+  }
   const cwd = process.cwd();
   if (existsSync(resolve(cwd, "standin"))) {
     return resolve(cwd, "standin/.data/ledger.json");
