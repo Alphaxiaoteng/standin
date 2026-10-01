@@ -22,7 +22,8 @@ import {
   type SopTickResult,
   type ScorePosteriorPort,
 } from "./sop";
-import { initialGuardState, type GuardState } from "./guard";
+import type { BetaPosterior } from "./score";
+import { initialGuardState, resetDaily, type GuardState } from "./guard";
 import { listBounties, type Bounty, type BountyKind } from "../market/bounties";
 import {
   sourceHealth,
@@ -37,7 +38,7 @@ import {
   fetchHnTop,
 } from "../market/sources";
 import { getStats, recordSpend } from "../store";
-import { settle } from "../ledger";
+import { settle, getLedger, toDateKey } from "../ledger";
 import { emitNotice, latestNoticeFor } from "./notify";
 import type { BriefSnapshot, SpreadSample } from "./verify";
 
@@ -56,12 +57,99 @@ interface SopRuntime {
 
 const globalForSop = globalThis as unknown as { __standinSopRuntime?: SopRuntime };
 
+/* ------------------------------------------------------------------ */
+/* 止损与后验持久化（T4）：账本 KV 是唯一事实源，重启不丢                  */
+/* ------------------------------------------------------------------ */
+
+export interface KvLike {
+  getKv<T = unknown>(key: string): T | undefined;
+  setKv<T = unknown>(key: string, value: T): void;
+}
+
+const GUARD_KV_KEY = "agent:guard";
+const POSTERIOR_KV_KEY = "agent:posterior";
+
+interface PosteriorKvFile {
+  kinds: Array<{ kind: BountyKind; alpha: number; beta: number }>;
+}
+
+function isPlausibleGuard(v: unknown): v is GuardState {
+  if (typeof v !== "object" || v === null) return false;
+  const g = v as GuardState;
+  return (
+    typeof g.dateKey === "string"
+    && Number.isFinite(g.dailyBudgetUsdc)
+    && Number.isFinite(g.spentTodayUsdc)
+    && typeof g.halt === "boolean"
+    && Array.isArray(g.pausedKinds)
+    && typeof g.consecutiveLossesByKind === "object"
+  );
+}
+
+/** 启动恢复：KV 里有止损状态就用它；跨天自动重置当日预算与亏损 */
+export function restoreGuardFromKv(kv: KvLike, now: number = Date.now(), dailyBudgetUsdc = DAILY_BUDGET_USDC): GuardState {
+  const stored = kv.getKv<GuardState>(GUARD_KV_KEY);
+  if (!isPlausibleGuard(stored)) {
+    return initialGuardState(dailyBudgetUsdc, now);
+  }
+  return stored.dateKey === toDateKey(now) ? stored : resetDaily(stored, now);
+}
+
+/** 启动恢复：后验计数（每个任务类型的 Beta α/β） */
+export function restorePosteriorFromKv(kv: KvLike): Map<BountyKind, BetaPosterior> {
+  const store = emptyPosteriorStore();
+  const rec = kv.getKv<PosteriorKvFile>(POSTERIOR_KV_KEY);
+  if (rec && Array.isArray(rec.kinds)) {
+    for (const e of rec.kinds) {
+      if (e && typeof e.kind === "string" && Number.isFinite(e.alpha) && Number.isFinite(e.beta)) {
+        store.set(e.kind, { alpha: e.alpha, beta: e.beta });
+      }
+    }
+  }
+  return store;
+}
+
+export function persistSopStateToKv(
+  kv: KvLike,
+  guard: GuardState,
+  store: Map<BountyKind, BetaPosterior>,
+): void {
+  const kinds: PosteriorKvFile["kinds"] = [];
+  store.forEach((v, k) => kinds.push({ kind: k, alpha: v.alpha, beta: v.beta }));
+  kv.setKv(POSTERIOR_KV_KEY, { kinds } satisfies PosteriorKvFile);
+  kv.setKv(GUARD_KV_KEY, guard);
+}
+
+/** 每次 tick 结束后写回；写失败 → 沿用账本回滚语义：停机并禁止继续花钱 */
+export function persistAfterTick(
+  kv: KvLike & { setHalted(halted: boolean, reason?: string | null): void },
+  state: { guard: GuardState; store: Map<BountyKind, BetaPosterior> },
+  result: SopTickResult,
+): void {
+  try {
+    persistSopStateToKv(kv, state.guard, state.store);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    try {
+      kv.setHalted(true, `状态持久化失败，已停机：${msg}`);
+    } catch {
+      // 二次写失败静默（与账本回滚存盘语义一致）
+    }
+    result.steps.push({ step: "复盘", status: "fail", note: `状态持久化失败，已停机：${msg}` });
+  }
+}
+
 function runtime(): SopRuntime {
-  globalForSop.__standinSopRuntime ??= {
-    guard: initialGuardState(DAILY_BUDGET_USDC),
-    store: emptyPosteriorStore(),
-    posterior: memoryPosteriorPort(),
-  };
+  globalForSop.__standinSopRuntime ??= (() => {
+    const ledger = getLedger();
+    // 启动时从账本 KV 恢复，重启服务后止损与后验不丢
+    const store = restorePosteriorFromKv(ledger);
+    return {
+      guard: restoreGuardFromKv(ledger),
+      store,
+      posterior: memoryPosteriorPort(store),
+    };
+  })();
   return globalForSop.__standinSopRuntime;
 }
 
@@ -245,7 +333,10 @@ export async function tick(req: { kind?: BountyKind; bountyId?: string }): Promi
     perTradeCapUsdc: PER_TRADE_CAP_USDC,
     dailyBudgetUsdc: DAILY_BUDGET_USDC,
   };
-  return runSopTick(body, buildDeps(rt));
+  const result = await runSopTick(body, buildDeps(rt));
+  // 每次 tick 结束后写回止损与后验；写失败 → 停机
+  persistAfterTick(getLedger(), rt, result);
+  return result;
 }
 
 export function guardRef(): GuardState {
