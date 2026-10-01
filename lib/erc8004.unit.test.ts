@@ -9,6 +9,7 @@ import {
   type ReceiptClient,
   type SummaryClient,
 } from "./erc8004";
+import { setKv } from "./ledger";
 
 const OWNER = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1" as const;
 
@@ -117,8 +118,12 @@ describe("ERC-8004 reads", () => {
   });
 
   it("getIdentityStatus reports unregistered honestly", async () => {
+    // 前面的 registerAgent 成功用例会污染共享 KV，使 storedIdentity() 非空，
+    // 从而让 getIdentityStatus 走 registered 分支去 await 实时 RPC（并行负载下 5s 超时）。
+    // 本用例验证的是"未注册"分支，先清掉身份键，保证确定性、不联网。
+    setKv("agent:identity", undefined);
     const status = await getIdentityStatus();
-    if (status.registered) return; // 其他用例可能已注册
+    expect(status.registered).toBe(false);
     expect(status.detail).toContain("尚未注册");
   });
 });

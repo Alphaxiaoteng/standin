@@ -76,7 +76,7 @@ export interface AgentIdentityRecord {
   owner: string;
 }
 
-const IDENTITY_KV_KEY = "agent:identity";
+export const IDENTITY_KV_KEY = "agent:identity";
 
 export function storedIdentity(): AgentIdentityRecord | null {
   const rec = getKv<AgentIdentityRecord>(IDENTITY_KV_KEY);
