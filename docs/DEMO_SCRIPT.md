@@ -3,10 +3,23 @@
 > 四个场景对应四种真实结果：赢、亏、跳过、拦截。全部由真实数据与规则裁决，无任何写死结果。
 > 所有金额为 Monad 测试网演示规模；页面页脚固定声明"Monad 测试网演示，不代表真实投资收益"。
 
+## 录制纪律（违反即废）
+
+- **全程真人解说口播，严禁任何 AI 合成语音 / TTS / 变声**（比赛规则红线）。
+- 严禁倍速 / 快进 / 抽帧；等待真实抓取用硬跳切。分辨率 ≥720p。
+- 每段都有人声，无纯背景乐配字幕。
+- 页面所有数字为真实运行所得，不得后期改数。
+
+## 环境变量
+
+脚本中 `$BASE` 指向运行实例：本地 `http://localhost:3313`，或公网 Live Demo 地址（见
+`docs/SUBMISSION.md` 的 Live Demo URL；`cloudflared tunnel --url http://127.0.0.1:3313`
+可免登录生成临时公网地址）。`curl $BASE/...` 两种环境通用。
+
 ## 场景一 · 赢（数据简报验收通过）
 
-1. `curl -s localhost:3313/api/opportunities | jq '.opportunities[0]'` — 看 Agent 选中哪单。
-2. `curl -s -X POST localhost:3313/api/earnings/run -H 'content-type: application/json' -d '{"kind":"data_brief"}' | jq '{status: .task.status, verify: .verify.checks, steps: [.steps[].note]}'`
+1. `curl -s $BASE/api/opportunities | jq '.opportunities[0]'` — 看 Agent 选中哪单。
+2. `curl -s -X POST $BASE/api/earnings/run -H 'content-type: application/json' -d '{"kind":"data_brief"}' | jq '{status: .task.status, verify: .verify.checks, steps: [.steps[].note]}'`
 3. 看点：验收清单逐条打勾（三源中位数偏差 ≤50bps、价格新鲜度 ≤60s、热点 5 条且可独立回查榜单）。
 4. DEMO BUYER 单：立即入账，账本条目 `meta.billing=demo`，页面标 **DEMO BUYER**。
    COMMUNITY BUYER 单：状态为 PENDING（待链上付款），不入账收入——`settlement=pending`。
@@ -14,15 +27,15 @@
 ## 场景二 · 亏（验收未通过，成本沉没）
 
 1. 发布一条价差容忍带不可能达到的悬赏（把容忍带调到 10000bps=100%，窗口内必然"未超过阈值"）：
-   `curl -s -X POST localhost:3313/api/bounties -H 'content-type: application/json' -d '{"kind":"spread_watch","rewardUsdc":2,"costUsdc":3.6,"windowSec":30,"toleranceBps":10000,"buyerType":"third_party","buyerAddress":"0x你的测试钱包","buyerName":"COMMUNITY BUYER"}'`
-2. 跑这一单：`curl -s -X POST localhost:3313/api/earnings/run -H 'content-type: application/json' -d '{"bountyId":"<上一步返回的 id>"}' | jq '{status: .task.status, failReason: .task.failReason}'`
+   `curl -s -X POST $BASE/api/bounties -H 'content-type: application/json' -d '{"kind":"spread_watch","rewardUsdc":2,"costUsdc":3.6,"windowSec":30,"toleranceBps":10000,"buyerType":"third_party","buyerAddress":"0x你的测试钱包","buyerName":"COMMUNITY BUYER"}'`
+2. 跑这一单：`curl -s -X POST $BASE/api/earnings/run -H 'content-type: application/json' -d '{"bountyId":"<上一步返回的 id>"}' | jq '{status: .task.status, failReason: .task.failReason}'`
 3. 看点：未超过阈值 → 验收失败 → 成本已花、收入 0 → 账本记 FAILED，止损连亏计数 +1。
    （data_brief 的新鲜度窗口固定为 60s，不随悬赏参数变化，故亏损场景用价差容忍带制造。）
 4. 连续亏损触达日预算 30% 止损线时，Agent 自动停手（场景四的门禁层也会亮红灯）。
 
 ## 场景三 · 跳过（EV ≤ 0，放弃是决定不是失败）
 
-1. `curl -s localhost:3313/api/opportunities | jq '[.skipped[] | {id, reason}]'`
+1. `curl -s $BASE/api/opportunities | jq '[.skipped[] | {id, reason}]'`
 2. 看点：报酬覆盖不了成本或风险惩罚的悬赏被算法剔除，理由由打分/选择规则模板给出
    （如 `EV ≤ 0`、`余额不足`、`该任务类型因连亏暂停`），无 LLM 参与。
 3. 页面上放弃卡片置灰、无按钮，理由可读。

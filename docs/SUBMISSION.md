@@ -73,7 +73,7 @@
 | 项目名与 Tagline | 已完成 | 本文档顶部 |
 | 方案介绍与 Why Monad | 已完成（见本文档 §三） | 高吞吐低成本的 EVM 测试网让「每笔彩排报告都先比对意图再放款」在演示规模下可行。合约已部署到 10143（见 §一.1 部署状态行），链上锚定已通过钓鱼拦截交易验证。 |
 | Demo 视频（2-3 分钟） | **待完成** | 按 `docs/DEMO_SCRIPT.md`（3:08 逐镜脚本）录制；**官方规则禁止 AI 合成语音，必须真人解说** |
-| Live Demo URL | **待完成** | 仓库已含完整 Next.js 生产构建（`pnpm build` exit 0）；需登录 Vercel/Railway 一键部署（CLI 已装但无凭据，见阻塞项） |
+| Live Demo URL | ✅ 公网可达（临时隧道） | `https://quest-chairman-brown-exploring.trycloudflare.com`（cloudflared 免登录隧道 → 本机 :3340 生产构建；五页面 + API 全部 HTTP 200，浏览器渲染已验证）。注意：trycloudflare 地址在进程重启后会变化，提交时以当时运行的隧道地址为准；正式固定域名可后续 `npx vercel login` 后一键部署 |
 | 代码仓库（公开） | ✅ 已完成 | https://github.com/Alphaxiaoteng/standin （public，20 commit 全量增量历史，评委可逐条核验六周内构建） |
 | 部署证明与交易哈希 | ✅ **已完成** | 两合约已真实部署（`eth_getCode` 非空字节码），部署交易哈希与块号见 §一.1 部署状态行。一份拦截裁决已锚定上链（块 67218203，`allowed=false`）。评委可运行 `curl` 命令独立复核。 |
 | 测试与构建快照 | 已完成（2026-10-01 复测） | `pnpm test` 203 passed / 17 files；`pnpm build` 通过；合约核对：`eth_getCode` StandInAnchor 4466 字节、PaymentVault.anchor() 返回 0x5140…930（与部署记录一致） |
