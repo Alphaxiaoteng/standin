@@ -12,11 +12,11 @@ import Link from "next/link";
 import {
   fetchStats,
   fetchEarningsReport,
-  fetchOpportunities,
+  fetchOpportunityBoard,
   runSopTask,
   type EarningsReport,
 } from "./components/api";
-import type { Opportunity, Stats } from "./components/types";
+import type { Opportunity, OpportunityBoard, Stats } from "./components/types";
 import LiveOpsStream from "./components/LiveOpsStream";
 import PageHead from "./components/PageHead";
 import { formatAmount } from "./components/format";
@@ -27,7 +27,7 @@ const USDC_MONAD = "0x534b2f3A21130d7a60830c2Df862319e593943A3";
 export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [report, setReport] = useState<EarningsReport | null>(null);
-  const [opportunities, setOpportunities] = useState<Opportunity[] | null>(null);
+  const [board, setBoard] = useState<OpportunityBoard | null>(null);
   const [busy, setBusy] = useState(false);
   const [activeTaskLabel, setActiveTaskLabel] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
@@ -36,7 +36,7 @@ export default function Home() {
   const reload = () => {
     void fetchStats().then(setStats);
     void fetchEarningsReport().then(setReport);
-    void fetchOpportunities().then(setOpportunities);
+    void fetchOpportunityBoard().then(setBoard);
   };
 
   useEffect(reload, []);
@@ -67,6 +67,24 @@ export default function Home() {
   const avoidedLoss = report?.avoidedLossUsdc ?? 0;
   const demoRevenue = report?.demoUsdc ?? 0;
   const todayCost = report?.todayCostUsdc ?? 0;
+
+  // 状态行绑定真实数据：数据源健康 + 止损状态，不再写死"健康度正常"
+  const healthEntries = Object.entries(board?.health?.sources ?? {});
+  const healthyCount = healthEntries.filter(([, v]) => v.healthy).length;
+  const totalSources = healthEntries.length;
+  const guard = board?.guard;
+  const agentState = busy
+    ? { tone: "run", text: `Agent 正在做：${activeTaskLabel}…（多源实时采集中）` }
+    : guard?.halt
+      ? { tone: "bad", text: guard.haltReason ?? "今日已触发止损，自动停手" }
+      : totalSources > 0 && healthyCount === 0
+        ? { tone: "bad", text: "所有数据源都不健康，今日停机（真实健康度裁决）" }
+        : {
+            tone: "ok",
+            text: `Agent 待命 · 数据源 ${healthyCount}/${totalSources} 健康 · 门禁就绪`,
+          };
+  const stateColor =
+    agentState.tone === "run" ? "var(--blue)" : agentState.tone === "bad" ? "var(--red)" : "var(--green)";
 
   const toggle = (k: "net" | "balance" | "avoided" | "demo") =>
     setOpenSource((cur) => (cur === k ? null : k));
@@ -220,22 +238,29 @@ export default function Home() {
         <IconActivity
           size={15}
           style={{
-            color: busy ? "var(--accent)" : "var(--green)",
+            color: stateColor,
             animation: busy ? "pulse 1.2s infinite ease-in-out" : "none",
           }}
         />
-        <span className="is-strong">
-          {busy
-            ? `Agent 正在做：${activeTaskLabel}…（多源实时采集中）`
-            : "Agent 处于待命状态：健康度正常，等待新任务触发"}
+        <span className="is-strong" style={{ color: stateColor }}>
+          {agentState.text}
         </span>
         <span className="spacer" />
+        <span className="srcstrip" title="数据源健康度（滑动窗口真实采样）">
+          {healthEntries.map(([name, v]) => (
+            <span key={name} className="src-chip" style={{ color: v.healthy ? "var(--green)" : "var(--red)" }}>
+              {name}
+              {v.healthy ? "✓" : "✗"}
+              <em>{v.score.toFixed(2)}</em>
+            </span>
+          ))}
+        </span>
         <Link
           href="/opportunities"
           className="muted"
           style={{ fontSize: 12, textDecoration: "underline" }}
         >
-          查看完整机会与决策看板 →
+          看板 →
         </Link>
       </div>
 
@@ -258,7 +283,7 @@ export default function Home() {
           </span>
         </div>
         <div className="demo-grid">
-          {(opportunities ?? []).map((o) => (
+          {((board?.opportunities ?? []) as Opportunity[]).map((o) => (
             <button
               key={o.id}
               type="button"
@@ -275,7 +300,7 @@ export default function Home() {
             </button>
           ))}
         </div>
-        {opportunities !== null && opportunities.length === 0 && (
+        {board !== null && (board?.opportunities ?? []).length === 0 && (
           <div className="tl-empty">
             当前没有入选机会（可能余额不足或 EV ≤ 0）。前往「机会与决策」看放弃理由。
           </div>

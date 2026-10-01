@@ -1591,3 +1591,75 @@ footer {
   font-size: 10.5px;
   font-family: var(--font-mono);
 }
+
+/* ---------- 驾驶舱细节打磨（第二轮） ---------- */
+
+/* 数字用等宽表格数字，跳动不抖版式 */
+.summary-value,
+.metric-value,
+.table-num,
+.opslog-line {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 选区与滚动条跟随主题 */
+::selection {
+  background: var(--green-dim);
+  color: var(--green);
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #1c2230;
+  border-radius: 2px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #2a3346;
+}
+
+/* 键盘可达性：聚焦即信号色 */
+:focus-visible {
+  outline: 1px solid var(--green);
+  outline-offset: 2px;
+}
+
+/* 数据源健康信号条 */
+.srcstrip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.src-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.src-chip em {
+  font-style: normal;
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+/* 新账本条目入列闪烁 */
+@keyframes opsFlash {
+  0% { background: var(--green-dim); }
+  100% { background: transparent; }
+}
+
+.opslog-line.is-new {
+  animation: opsFlash 2.4s ease-out 1;
+}

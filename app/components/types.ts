@@ -207,6 +207,7 @@ export interface OpportunityBoard {
   opportunities: OpportunityDecision[];
   skipped: SkipItem[];
   guard: GuardView;
+  health?: { sources: Record<string, { name: string; score: number; healthy: boolean }> };
   walletBalanceUsdc: number;
   config: { perTradeCapUsdc: number; dailyBudgetUsdc: number };
 }

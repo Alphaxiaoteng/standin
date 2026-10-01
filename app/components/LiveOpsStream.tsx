@@ -25,12 +25,12 @@ function timeOf(ts: number): string {
   return `${hh}:${mm}:${ss}`;
 }
 
-function lineOf(e: LedgerTaskEntry, i: number, total: number) {
+function lineOf(e: LedgerTaskEntry, i: number, total: number, newIds: Set<string>) {
   const meta = STATUS_OP[e.status] ?? { op: "EVENT", cls: "skip" };
   const net = e.netUsdc >= 0 ? `+${e.netUsdc.toFixed(2)}` : e.netUsdc.toFixed(2);
   const netColor = e.netUsdc > 0 ? "var(--green)" : e.netUsdc < 0 ? "var(--red)" : "var(--text-faint)";
   return (
-    <div key={`${e.id}-${i}`} className="opslog-line">
+    <div key={`${e.id}-${i}`} className={`opslog-line${newIds.has(e.id) ? " is-new" : ""}`}>
       <span className="t">{timeOf(e.ts)}</span>
       <span className={`op ${meta.cls}`}>{meta.op}</span>
       <span className="m">
@@ -49,7 +49,9 @@ export default function LiveOpsStream({ limit = 8 }: { limit?: number }) {
   const [entries, setEntries] = useState<LedgerTaskEntry[] | null>(null);
   const [pulse, setPulse] = useState(0);
   const [nowTs, setNowTs] = useState<number | null>(null);
+  const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const lastTopId = useRef<string | null>(null);
+  const entriesRef = useRef<LedgerTaskEntry[] | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -61,7 +63,14 @@ export default function LiveOpsStream({ limit = 8 }: { limit?: number }) {
       const top = list[0]?.id ?? null;
       if (top && lastTopId.current !== null && top !== lastTopId.current) {
         setPulse((n) => n + 1);
+        // 新条目高亮：本次出现、上次没有的条目
+        const prevIds = new Set((entriesRef.current ?? []).map((e) => e.id));
+        const fresh = new Set(
+          list.slice(0, limit).filter((e) => !prevIds.has(e.id)).map((e) => e.id),
+        );
+        if (fresh.size > 0) setNewIds(fresh);
       }
+      entriesRef.current = list;
       lastTopId.current = top;
     };
     void load();
@@ -70,7 +79,7 @@ export default function LiveOpsStream({ limit = 8 }: { limit?: number }) {
       alive = false;
       clearInterval(timer);
     };
-  }, []);
+  }, [limit]);
 
   const shown = (entries ?? []).slice(0, limit);
 
@@ -93,7 +102,7 @@ export default function LiveOpsStream({ limit = 8 }: { limit?: number }) {
             <span className="m">等待第一笔真实任务写入账本…</span>
           </div>
         ) : (
-          shown.map((e, i) => lineOf(e, i, entries?.length ?? 0))
+          shown.map((e, i) => lineOf(e, i, entries?.length ?? 0, newIds))
         )}
         <div className="opslog-line">
           <span className="t">{nowTs === null ? "--:--:--" : timeOf(nowTs)}</span>
