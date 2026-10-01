@@ -61,3 +61,22 @@
 ## 并发写入备注
 
 执行期间检测到另一会话（Orca 多代理）在同一工作区并发修改 README/docs/runner/runtime 并曾回滚 lib/agent 工作区（T3 首版丢失）。已按"每任务即改即提交"策略重建并提交；两边的文件集无交集。
+
+## 补齐验证（2026-10-01 晚，用户"还差点吧"反馈后）
+
+- [x] **真实"亏"场景**：发布 toleranceBps=10000 的 spread_watch（costUsdc 2.0）→ 必然"未超过阈值" →
+  FAILED、成本沉没；两单后 `todayNetUsdc=-3.7`。
+- [x] **notices.json 真实落盘（T3 手动验收成立）**：toleranceBps=0.01 的价差监测，真实价差 12.4/4.85 bps 越线 →
+  emitNotice 写入 `.data/notices.json`（3 条真实记录）→ 验收回放该时间戳 → spread_watch 端到端 PASS（settlement=pending）。
+- [x] **修复真实生产 bug**：verifySpreadWatch 的窗口曾固定为 [deliveredAt, deliveredAt]，而采样都在执行期间 →
+  spread_watch 永远判"未超过阈值"（单测因采样时刻与交付时刻对齐而未暴露）。执行器现回报真实 [windowStart, windowEnd]，
+  含回归测试。commit 526da94。
+- [x] **止损拦截全流程**：日亏 3.7 ≥ 预算 30% 止损线（3.0）→ guard.halt=true（"今日已停手，避免继续亏损 3.7"）→
+  下一单 status=intercepted、成本 0、avoidLossUsdc=0.4、账本记 INTERCEPTED；机会页显示强制止损横幅。
+  说明：中途 spread_watch 因连亏 3 单被自动暂停（设计行为），由操作员按 guard.ts 预设的人工解除路径清空 pausedKinds 后继续。
+- [x] **guardrail 三剧本标注"示例"**（T7-4）；**悬赏页与 README 增加演示定价说明**（对照 x402 Bazaar ~$0.005/次，方案 1.5）；
+  /api/bounties 开放 costUsdc（对齐 addBounty 既有参数）用于演示可控仓位。commit 5d490e1。
+- [x] **DEMO_SCRIPT 场景二修正**：data_brief 新鲜度窗口固定 60s 不随悬赏变化，强制亏损改用价差容忍带制造。
+
+至此四场景（赢/亏/跳过/拦截）均有真实账本证据；仍待真人：配置 STANDIN_AGENT_ADDRESS 后的真实转账 30 秒入账、
+ERC-8004 链上注册与反馈交易、录屏。
