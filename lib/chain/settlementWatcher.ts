@@ -17,6 +17,7 @@ import {
   type Bounty,
 } from "../market/bounties";
 import { getLedger, settle } from "../ledger";
+import { registerAgent, giveFeedbackFromBuyer, storedIdentity } from "../erc8004";
 
 const USDC_DECIMALS = 6;
 /** eth_getLogs 单段扫描的区块数：2026-10-01 实测 testnet-rpc.monad.xyz 限制 100 块窗口 */
@@ -163,6 +164,7 @@ export interface SettlementPollOutcome {
   result: "confirmed" | "unpaid" | "pending" | "skipped";
   txHash?: string;
   detail?: string;
+  feedback?: { txHash?: string; skipped?: string };
 }
 
 function explorerTxUrl(txHash: string): string {
@@ -214,9 +216,9 @@ export async function pollPendingSettlements(
       } else if (r.status === "unknown") {
         outcomes.push({ bountyId: bounty.id, result: "pending", detail: `链上查询失败：${r.reason}` });
       } else {
-        confirmBounty(bounty, r, now);
+        const feedback = await confirmBounty(bounty, r, now);
         hooks.onConfirmed?.(bounty, bounty.rewardUsdc);
-        outcomes.push({ bountyId: bounty.id, result: "confirmed", txHash: r.txHash });
+        outcomes.push({ bountyId: bounty.id, result: "confirmed", txHash: r.txHash, feedback });
       }
       continue;
     }
@@ -228,9 +230,9 @@ export async function pollPendingSettlements(
       since: bounty.createdAt,
     });
     if (r.status === "found") {
-      confirmBounty(bounty, r, now);
+      const feedback = await confirmBounty(bounty, r, now);
       hooks.onConfirmed?.(bounty, bounty.rewardUsdc);
-      outcomes.push({ bountyId: bounty.id, result: "confirmed", txHash: r.txHash });
+      outcomes.push({ bountyId: bounty.id, result: "confirmed", txHash: r.txHash, feedback });
     } else if (r.status === "unknown") {
       outcomes.push({ bountyId: bounty.id, result: "pending", detail: `链上查询失败：${r.reason}` });
     } else {
@@ -240,8 +242,8 @@ export async function pollPendingSettlements(
   return outcomes;
 }
 
-/** 确认入账：settlement=confirmed + 收入账（billing=onchain）+ 余额增加 */
-function confirmBounty(bounty: Bounty, r: Extract<PaymentResult, { status: "found" }>, now: number): void {
+/** 确认入账：settlement=confirmed + 收入账（billing=onchain）+ 余额增加 + ERC-8004 反馈（可选） */
+async function confirmBounty(bounty: Bounty, r: Extract<PaymentResult, { status: "found" }>, now: number): Promise<SettlementPollOutcome["feedback"]> {
   updateBountySettlement(bounty.id, {
     settlement: "confirmed",
     status: "done",
@@ -266,4 +268,26 @@ function confirmBounty(bounty: Bounty, r: Extract<PaymentResult, { status: "foun
     },
   });
   getLedger().creditBalance(revenue);
+
+  // ERC-8004（T6，可选）：注册身份一次；每笔链上确认结算后由买方侧提交声誉反馈。
+  // 密钥未配置时诚实跳过，不影响结算。
+  try {
+    let identity = storedIdentity();
+    if (!identity) {
+      const reg = await registerAgent();
+      identity = reg.ok ? reg.record : null;
+    }
+    if (!identity) return { skipped: "未注册 ERC-8004 身份（未配置 STANDIN_AGENT_PRIVATE_KEY）" };
+    const fb = await giveFeedbackFromBuyer({
+      agentId: identity.agentId,
+      score: 100,
+      tag1: bounty.kind,
+      tag2: "settlement-confirmed",
+      feedbackURI: explorerTxUrl(r.txHash),
+    });
+    if (fb.ok) return { txHash: fb.txHash };
+    return { skipped: fb.detail ?? fb.reason };
+  } catch (err) {
+    return { skipped: err instanceof Error ? err.message : String(err) };
+  }
 }
