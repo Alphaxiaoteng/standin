@@ -17,6 +17,8 @@ export const dynamic = "force-dynamic";
 interface BountyInput {
   kind?: unknown;
   rewardUsdc?: unknown;
+  /** Agent 执行成本（演示可控仓位用）；缺省用该类型的默认成本 */
+  costUsdc?: unknown;
   windowSec?: unknown;
   toleranceBps?: unknown;
   buyerType?: unknown;
@@ -67,6 +69,14 @@ export async function POST(request: Request) {
     return bad("toleranceBps 必须是大于 0 的基点数");
   }
 
+  const costUsdc =
+    body.costUsdc === undefined || body.costUsdc === null
+      ? undefined
+      : Number(body.costUsdc);
+  if (costUsdc !== undefined && (!Number.isFinite(costUsdc) || costUsdc <= 0)) {
+    return bad("costUsdc 必须是大于 0 的数字（USDC）");
+  }
+
   const buyerType = body.buyerType === "demo" ? "demo" : "third_party";
   // T5：第三方买方必须提供钱包地址，否则链上付款无从核对；DEMO BUYER 不要求
   let buyerAddress: string | undefined;
@@ -84,6 +94,7 @@ export async function POST(request: Request) {
   const bounty = addBounty({
     kind,
     rewardUsdc,
+    costUsdc,
     windowSec,
     toleranceBps,
     buyerType,

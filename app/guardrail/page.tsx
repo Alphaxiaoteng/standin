@@ -74,7 +74,7 @@ export default function GuardrailPage() {
     <div className="stack">
       <PageHead
         title="门禁红绿灯"
-        desc="AI Agent 想花钱时，先比对「声明意图」与「实际 calldata」：逐字段一致才放行，任一不符当场拦截。没有这道门，一次提示词注入就能把本金转走。"
+        desc="三个剧本为预置示例（本地彩排，不上链）：比对「声明意图」与「实际 calldata」，逐字段一致才放行，任一不符当场拦截。"
       />
 
       {error && (

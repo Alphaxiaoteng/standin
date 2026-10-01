@@ -13,10 +13,11 @@
 
 ## 场景二 · 亏（验收未通过，成本沉没）
 
-1. 发布一条窗口不可能达到的悬赏：
-   `curl -s -X POST localhost:3313/api/bounties -H 'content-type: application/json' -d '{"kind":"data_brief","rewardUsdc":2,"windowSec":1,"buyerType":"third_party","buyerAddress":"0x你的测试钱包","buyerName":"COMMUNITY BUYER"}'`
+1. 发布一条价差容忍带不可能达到的悬赏（把容忍带调到 10000bps=100%，窗口内必然"未超过阈值"）：
+   `curl -s -X POST localhost:3313/api/bounties -H 'content-type: application/json' -d '{"kind":"spread_watch","rewardUsdc":2,"costUsdc":3.6,"windowSec":30,"toleranceBps":10000,"buyerType":"third_party","buyerAddress":"0x你的测试钱包","buyerName":"COMMUNITY BUYER"}'`
 2. 跑这一单：`curl -s -X POST localhost:3313/api/earnings/run -H 'content-type: application/json' -d '{"bountyId":"<上一步返回的 id>"}' | jq '{status: .task.status, failReason: .task.failReason}'`
-3. 看点：新鲜度超窗 → 验收失败 → 成本已花、收入 0 → 账本记 FAILED，止损计数 +1。
+3. 看点：未超过阈值 → 验收失败 → 成本已花、收入 0 → 账本记 FAILED，止损连亏计数 +1。
+   （data_brief 的新鲜度窗口固定为 60s，不随悬赏参数变化，故亏损场景用价差容忍带制造。）
 4. 连续亏损触达日预算 30% 止损线时，Agent 自动停手（场景四的门禁层也会亮红灯）。
 
 ## 场景三 · 跳过（EV ≤ 0，放弃是决定不是失败）

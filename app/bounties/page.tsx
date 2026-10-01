@@ -42,7 +42,7 @@ export default function BountiesPage() {
     <div className="stack">
       <PageHead
         title="悬赏市场"
-        desc="买方在这里发布数据任务，Agent 按打分决定接不接。报酬由验收结果决定：验收不通过，成本照付、拿不到报酬。"
+        desc="买方在这里发布数据任务，Agent 按打分决定接不接。报酬由验收结果决定：验收不通过，成本照付、拿不到报酬。报酬为 Monad 测试网演示定价（同类 x402 服务市场价约 $0.005/次起），不代表真实市场行情。"
         actions={
           <button
             type="button"
