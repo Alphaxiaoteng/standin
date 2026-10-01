@@ -65,6 +65,11 @@ export interface HealthPort {
   allUnhealthy(): boolean;
 }
 
+/** 独立回查 HN 榜单：必须在验收阶段调用（与执行阶段抓取相互独立）；null 表示回查失败 */
+export interface BoardRecheckPort {
+  recheck(): Promise<{ board: string[]; fetchedAt: number } | null>;
+}
+
 export interface ExecuteResult {
   ok: boolean;
   snapshot?: BriefSnapshot;
@@ -84,6 +89,8 @@ export interface SopDeps {
   ledger: LedgerPort;
   posterior: ScorePosteriorPort;
   executor: ExecutorPort;
+  /** data_brief 验收阶段独立回查榜单；缺省时沿用快照自带的 hnBoard（仅测试用） */
+  boardRecheck?: BoardRecheckPort;
   /** 调用方持有；本函数结算时用 settleTrade 更新（Object.assign 回写） */
   guard: GuardState;
   now?: () => number;
@@ -422,9 +429,23 @@ export async function runSopTick(req: SopTickRequest, deps: SopDeps): Promise<So
     };
   }
 
-  /* 6. 验收 */
+  /* 6. 验收（data_brief 的榜单独立回查发生在本阶段，与执行阶段抓取相互独立） */
   const deliveredAt = now();
-  const { verdict, checks } = verifyChecks(bounty.kind, ex, bounty.toleranceBps, deliveredAt);
+  let boardRecheckFailed = false;
+  if (bounty.kind === "data_brief" && deps.boardRecheck) {
+    const re = await deps.boardRecheck.recheck();
+    if (re && ex.snapshot) {
+      ex.snapshot.hnBoard = re.board;
+      ex.snapshot.hnBoardFetchedAt = re.fetchedAt;
+    } else {
+      boardRecheckFailed = true;
+    }
+  }
+  let { verdict, checks } = verifyChecks(bounty.kind, ex, bounty.toleranceBps, deliveredAt);
+  if (boardRecheckFailed) {
+    verdict = { passed: false, reasons: ["无法独立回查榜单", ...verdict.reasons] };
+    checks = [...checks, { label: "独立回查榜单", passed: false }];
+  }
   steps.push(verdict.passed ? step("验收", "ok", "规则逐条通过") : step("验收", "fail", verdict.reasons.join("；") || "未通过"));
 
   /* 7. 结算 */

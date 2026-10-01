@@ -123,6 +123,38 @@ describe("fetchHnTop", () => {
     expect(out.value.titles).toEqual(["t11", "t12", "t13", "t14", "t15"]);
   });
 
+  it("returns an independent board larger than the delivered titles", async () => {
+    const out = await fetchHnTop(8, {
+      now: () => 3_000,
+      fetch: async (input) => {
+        const href = String(input);
+        if (href.endsWith("/topstories.json")) return jsonResponse([11, 12, 13, 14, 15, 16, 17, 18]);
+        const id = href.match(/item\/(\d+)/)?.[1];
+        return jsonResponse({ id: Number(id), title: `t${id}` });
+      },
+    });
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.value.titles).toEqual(["t11", "t12", "t13", "t14", "t15"]);
+    expect(out.value.board).toEqual(["t11", "t12", "t13", "t14", "t15", "t16", "t17", "t18"]);
+    expect(Object.is(out.value.titles, out.value.board)).toBe(false);
+  });
+
+  it("defaults to a 5-item board for legacy calls", async () => {
+    const out = await fetchHnTop({
+      fetch: async (input) => {
+        const href = String(input);
+        if (href.endsWith("/topstories.json")) return jsonResponse([11, 12, 13, 14, 15, 16]);
+        const id = href.match(/item\/(\d+)/)?.[1];
+        return jsonResponse({ id: Number(id), title: `t${id}` });
+      },
+    });
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.value.board).toEqual(out.value.titles);
+    expect(Object.is(out.value.titles, out.value.board)).toBe(false);
+  });
+
   it("returns 源限流 when the board responds 429", async () => {
     const out = await fetchHnTop({
       fetch: async () => new Response("", { status: 429 }),

@@ -271,6 +271,45 @@ describe("runSopTick safety gates and skip branches", () => {
   });
 });
 
+describe("runSopTick board recheck (验收阶段独立回查榜单)", () => {
+  it("fails verification and books a loss when the independent recheck fails", async () => {
+    const rig = createRig();
+    rig.deps.boardRecheck = { recheck: async () => null };
+
+    const res = await runSopTick(rig.req, rig.deps);
+    expect(res.ok).toBe(false);
+    expect(res.task.status).toBe("failed");
+    expect(res.task.failReason).toContain("无法独立回查榜单");
+    expect(res.task.netUsdc).toBe(-0.4);
+    expect(rig.ledgerEntries[0]).toMatchObject({ status: "FAILED", costUsdc: 0.4, revenueUsdc: 0 });
+    expect(rig.ledgerEntries[0].reason).toContain("无法独立回查榜单");
+  });
+
+  it("judges against the rechecked board, not the executor-provided one", async () => {
+    const rig = createRig();
+    // 回查到的榜单不含执行阶段的任何热点 → 交付内容不可回查，必须判负
+    rig.deps.boardRecheck = { recheck: async () => ({ board: ["x1", "x2", "x3", "x4", "x5"], fetchedAt: NOW }) };
+
+    const res = await runSopTick(rig.req, rig.deps);
+    expect(res.ok).toBe(false);
+    expect(res.task.failReason).toContain("热点不在榜单");
+  });
+
+  it("passes when the rechecked board contains the delivered headlines", async () => {
+    // 执行阶段快照故意带空榜单：只有回查成功才能通过验收
+    const snap = sampleBrief();
+    snap.hnBoard = [];
+    const rig = createRig({ executorResult: { ok: true, snapshot: snap } });
+    rig.deps.boardRecheck = {
+      recheck: async () => ({ board: ["h1", "h2", "h3", "h4", "h5", "h6"], fetchedAt: NOW }),
+    };
+
+    const res = await runSopTick(rig.req, rig.deps);
+    expect(res.ok).toBe(true);
+    expect(res.task.status).toBe("passed");
+  });
+});
+
 describe("runSopTick ledger crash rollback (PRD §四 结算回滚并停机)", () => {
   it("rolls back wallet debit when ledger write fails, prohibiting further spend", async () => {
     const rig = createRig({ throwOnLedgerSettle: true });

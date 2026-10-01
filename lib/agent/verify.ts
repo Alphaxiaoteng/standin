@@ -16,6 +16,8 @@ export interface BriefSnapshot {
   eth: { coingecko: PriceQuote; coinbase: PriceQuote }
   headlines: string[]
   hnBoard: string[]
+  /** 独立回查榜单的抓取时刻（与 headlines 抓取相互独立） */
+  hnBoardFetchedAt?: number
 }
 
 export interface VerifyResult {
@@ -69,8 +71,15 @@ export function verifyBrief(snapshot: BriefSnapshot, deliveredAt: number): Verif
   if (!Array.isArray(snapshot.headlines) || snapshot.headlines.length !== 5) {
     reasons.push("热点不是 5 条")
   } else {
-    for (const title of snapshot.headlines) {
-      if (!snapshot.hnBoard?.includes(title)) reasons.push(`热点不在榜单：${title}`)
+    // 防自证：榜单与热点不能是同一份数据（同一引用即自己验证自己）
+    if (Object.is(snapshot.headlines, snapshot.hnBoard)) {
+      reasons.push("榜单与热点是同一份数据，无法独立回查")
+    } else if (!Array.isArray(snapshot.hnBoard) || snapshot.hnBoard.length === 0) {
+      reasons.push("榜单为空，无法独立回查")
+    } else {
+      for (const title of snapshot.headlines) {
+        if (!snapshot.hnBoard.includes(title)) reasons.push(`热点不在榜单：${title}`)
+      }
     }
   }
 

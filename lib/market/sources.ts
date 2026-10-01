@@ -91,7 +91,16 @@ export async function fetchCoinbaseSpot(
   return { ok: true, value: { pair, usd }, fetchedAt: res.fetchedAt, latencyMs: res.latencyMs }
 }
 
-export async function fetchHnTop(deps: SourceDeps = {}): Promise<SourceResult<{ titles: string[] }>> {
+export async function fetchHnTop(
+  boardSizeOrDeps: number | SourceDeps = 5,
+  maybeDeps: SourceDeps = {},
+): Promise<SourceResult<{ titles: string[]; board: string[] }>> {
+  // 兼容旧调用 fetchHnTop(deps)：第一个参数是对象时视为 deps
+  const deps = (typeof boardSizeOrDeps === "object" ? boardSizeOrDeps : maybeDeps) as SourceDeps
+  const boardSize =
+    typeof boardSizeOrDeps === "number" && Number.isInteger(boardSizeOrDeps) && boardSizeOrDeps >= 5
+      ? boardSizeOrDeps
+      : 5
   const now = deps.now ?? Date.now
   const started = now()
   const board = await attempt(`${HN_URL}/topstories.json`, deps)
@@ -99,11 +108,11 @@ export async function fetchHnTop(deps: SourceDeps = {}): Promise<SourceResult<{ 
   if (!Array.isArray(board.body)) {
     return { ok: false, error: "响应无法解析", fetchedAt: board.fetchedAt, latencyMs: board.latencyMs }
   }
-  const ids = board.body.filter((id): id is number => typeof id === "number").slice(0, 5)
+  const ids = board.body.filter((id): id is number => typeof id === "number").slice(0, boardSize)
   if (ids.length < 5) {
     return { ok: false, error: "榜单不足", fetchedAt: board.fetchedAt, latencyMs: board.latencyMs }
   }
-  const titles: string[] = []
+  const boardTitles: string[] = []
   for (const id of ids) {
     const item = await attempt(`${HN_URL}/item/${id}.json`, deps)
     if (!item.ok) return item
@@ -111,8 +120,14 @@ export async function fetchHnTop(deps: SourceDeps = {}): Promise<SourceResult<{ 
     if (typeof title !== "string" || title.length === 0) {
       return { ok: false, error: "响应无法解析", fetchedAt: item.fetchedAt, latencyMs: item.fetchedAt - started }
     }
-    titles.push(title)
+    boardTitles.push(title)
   }
   const fetchedAt = now()
-  return { ok: true, value: { titles }, fetchedAt, latencyMs: fetchedAt - started }
+  // titles 是交付的 5 条热点；board 是独立回查榜单（可为更大窗口），二者分开使用
+  return {
+    ok: true,
+    value: { titles: boardTitles.slice(0, 5), board: boardTitles },
+    fetchedAt,
+    latencyMs: fetchedAt - started,
+  }
 }

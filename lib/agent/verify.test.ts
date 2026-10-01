@@ -73,6 +73,20 @@ describe("verifyBrief", () => {
     expect(out.reasons.some((r) => r.includes("missing"))).toBe(true);
   });
 
+  it("fails when the board is empty (无法独立回查)", () => {
+    const out = verifyBrief(brief({ hnBoard: [] }), DELIVERED);
+    expect(out.passed).toBe(false);
+    expect(out.reasons.some((r) => r.includes("榜单为空"))).toBe(true);
+  });
+
+  it("fails when the board is the same array reference as headlines (防自证)", () => {
+    const shared = ["a", "b", "c", "d", "e"];
+    expect(Object.is(shared, shared)).toBe(true);
+    const out = verifyBrief(brief({ headlines: shared, hnBoard: shared }), DELIVERED);
+    expect(out.passed).toBe(false);
+    expect(out.reasons.some((r) => r.includes("同一份数据"))).toBe(true);
+  });
+
   it("fails when a price field is missing", () => {
     const snap = brief();
     snap.eth.coinbase = { usd: Number.NaN, fetchedAt: DELIVERED };

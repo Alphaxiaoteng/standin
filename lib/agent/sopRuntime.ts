@@ -115,7 +115,8 @@ const executor = {
         btc: { coingecko: btc.coingecko, coinbase: btc.coinbase },
         eth: { coingecko: eth.coingecko, coinbase: eth.coinbase },
         headlines: hn.titles,
-        hnBoard: hn.titles,
+        // 榜单不由执行阶段提供：验收阶段独立回查后再填入，杜绝"自己验证自己"
+        hnBoard: [],
       };
       return { ok: true as const, snapshot };
     }
@@ -179,6 +180,19 @@ function buildDeps(rt: SopRuntime): SopDeps {
     },
     posterior: rt.posterior,
     executor,
+    boardRecheck: {
+      // 验收阶段独立回查：榜单取前 30 条，与执行阶段抓取相互独立
+      async recheck() {
+        // 抓 30 条榜单，交付热点仍取前 5 条；与执行阶段抓取相互独立
+        const r = await fetchHnTop(30);
+        if (!r.ok) {
+          recordFailure("hn", `独立回查失败：${r.error}`, r.latencyMs);
+          return null;
+        }
+        recordSuccess("hn", r.latencyMs);
+        return { board: r.value.board, fetchedAt: r.fetchedAt };
+      },
+    },
     guard: rt.guard,
   };
 }
