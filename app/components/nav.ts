@@ -43,7 +43,7 @@ export const NAV: NavEntry[] = [
   },
   {
     href: "/wallet",
-    label: "经营设置",
+    label: "本金甲板",
     subtitle: "本金、每日亏损上限与可做的生意",
     icon: IconWallet,
     group: "资产",

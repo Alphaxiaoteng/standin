@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * 本金控制甲板（终端驾驶舱重构）：逻辑与原经营设置页完全一致
+ * （createPolicy / revokePolicy / fetchStats 原样复用），只重做展示：
+ * 本金读数、/etc/guard.conf 风格的硬边界配置面板（数值全部来自真实常量）、
+ * 支出护栏策略表。超出边界时门禁强制拦截——本页只读配置与生效状态。
+ */
+
 import { useCallback, useEffect, useState } from "react";
 import PageHead from "../components/PageHead";
 import {
@@ -12,6 +19,19 @@ import type { Policy, Stats } from "../components/types";
 import { formatAmount, formatExpiry, isExpired } from "../components/format";
 import { Badge, Card, DataState, DataTable, Hash, Loading } from "../components/ui";
 import { IconPlus } from "../components/icons";
+
+function ConfLine({ k, v, tone }: { k: string; v: string; tone?: string }) {
+  return (
+    <div style={{ display: "flex", gap: 10, fontSize: 12, lineHeight: 1.7 }}>
+      <span className="mono" style={{ color: "var(--text-faint)", flex: "0 0 178px" }}>
+        {k}
+      </span>
+      <span className="mono" style={{ color: tone ?? "var(--text)" }}>
+        {v}
+      </span>
+    </div>
+  );
+}
 
 export default function WalletPage() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -55,8 +75,8 @@ export default function WalletPage() {
   return (
     <div className="stack">
       <PageHead
-        title="经营设置"
-        desc="设定 Agent 经营的三个硬边界：本金规模、每日最多亏多少（止损线）、以及允许做的生意类型。超出边界时门禁强制拦截。"
+        title="本金控制甲板"
+        desc="Agent 经营的硬边界在这里配置与生效：本金规模、每日止损线、可做的生意类型。边界在 Agent 之外强制——Agent 每一步都要问过它。"
         actions={
           <button
             type="button"
@@ -84,51 +104,54 @@ export default function WalletPage() {
       )}
 
       <div className="grid grid-3">
-        <Card title="经营本金" desc="Agent 可支配的最大余额（本地账本）">
+        <Card title="本金读数" desc="Agent 可支配余额（本地账本，演示规模）">
           {stats === null ? (
             <Loading rows={2} />
           ) : (
             <div className="stack" style={{ gap: 10 }}>
-              <div className="metric-value is-accent" style={{ fontSize: 32 }}>
+              <div className="metric-value is-accent" style={{ fontSize: 40, letterSpacing: "-0.01em" }}>
                 {formatAmount(stats.walletBalance)}
                 <span className="metric-unit">USDC</span>
               </div>
-              <div className="muted" style={{ fontSize: 12 }}>
-                今日已花 {formatAmount(stats.todaySpent)} USDC · 本金保护拦截{" "}
-                {stats.interceptCount} 次
-              </div>
+              <ConfLine k="spent_today" v={`${formatAmount(stats.todaySpent)} USDC`} />
+              <ConfLine
+                k="gates_intercepted"
+                v={`${stats.interceptCount} 次`}
+                tone="var(--green)"
+              />
             </div>
           )}
         </Card>
 
-        <Card title="每日最多亏多少" desc="在 Agent 之外强制执行的止损">
-          <dl className="dl">
-            <dt>单日止损线</dt>
-            <dd style={{ color: "var(--red)", fontWeight: 650 }}>
-              净亏损 ≥ 预算 30%（停手到次日）
-            </dd>
-            <dt>连亏熔断</dt>
-            <dd>同一类型连亏 3 单暂停接单</dd>
-            <dt>仓位控制</dt>
-            <dd>单笔不超过预算 35%；连亏 2 次仓位减半</dd>
-            <dt>���健康门槛</dt>
-            <dd>健康度低于 0.6 不接该任务</dd>
-          </dl>
+        <Card title="guard.conf" desc="止损与仓位——在 Agent 之外强制执行">
+          <div className="stack" style={{ gap: 2 }}>
+            <div className="mono" style={{ fontSize: 11, color: "var(--text-faint)", marginBottom: 6 }}>
+              # /etc/standin/guard.conf · 生效中
+            </div>
+            <ConfLine k="stop_loss_daily" v="net_loss >= 30% budget → halt" tone="var(--red)" />
+            <ConfLine k="consecutive_pause" v="3 losses same kind → pause kind" />
+            <ConfLine k="stake" v="min(5 USDC, 35% budget)" />
+            <ConfLine k="stake_halving" v="2-loss streak → stake / 2" />
+            <ConfLine k="min_source_health" v="0.6" />
+            <ConfLine k="daily_budget" v="10 USDC (demo)" />
+          </div>
         </Card>
 
-        <Card title="可做的生意类型" desc="当前系统支持的两类任务">
-          <dl className="dl">
-            <dt>任务 A · 数据简报</dt>
-            <dd>BTC/ETH 双源报价 + HN 5 条热点，新鲜度 ≤ 60 秒</dd>
-            <dt>任务 B · 价差监测</dt>
-            <dd>两源价差越过 50bps 容忍带即通知，未越带则记亏</dd>
-            <dt>裁决原则</dt>
-            <dd style={{ color: "var(--green)" }}>真实数据裁决，不保证赚钱</dd>
-          </dl>
+        <Card title="jobs.conf" desc="当前系统支持的两类任务">
+          <div className="stack" style={{ gap: 2 }}>
+            <div className="mono" style={{ fontSize: 11, color: "var(--text-faint)", marginBottom: 6 }}>
+              # /etc/standin/jobs.conf · 真实数据裁决
+            </div>
+            <ConfLine k="job A data_brief" v="BTC/ETH 三源价 + HN 热点" />
+            <ConfLine k="freshness" v="<= 60s · median dev <= 50bps" />
+            <ConfLine k="job B spread_watch" v="breach > band → notify → replay" />
+            <ConfLine k="settlement" v="on-chain USDC receipt ONLY" tone="var(--green)" />
+            <ConfLine k="guarantee" v="none. 真实裁决，不保证赚钱" tone="var(--red)" />
+          </div>
         </Card>
       </div>
 
-      <Card title="支出护栏（白名单与上限）" desc="限定每个 Agent 对指定商户单笔和每周最多花多少" flush>
+      <Card title="支出护栏策略" desc="限定每个 Agent 对指定商户单笔和每周最多花多少" flush>
         <DataState
           data={policies}
           emptyTitle="暂无策略"

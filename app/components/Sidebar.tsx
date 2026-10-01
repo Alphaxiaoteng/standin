@@ -19,8 +19,8 @@ export default function Sidebar() {
           <IconShield size={17} />
         </span>
         <span className="brand-text">
-          <span className="brand-name">StandIn</span>
-          <span className="brand-sub">Agent 支付护栏</span>
+          <span className="brand-name">standin://ops</span>
+          <span className="brand-sub">支付护栏 · 实时操作台</span>
         </span>
       </div>
 

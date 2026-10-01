@@ -11,15 +11,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   fetchStats,
-  fetchTransactions,
-  fetchIntercepts,
   fetchEarningsReport,
   fetchOpportunities,
   runSopTask,
   type EarningsReport,
 } from "./components/api";
-import type { Intercept, Opportunity, Stats, Transaction } from "./components/types";
-import { buildTimeline, Timeline } from "./components/Timeline";
+import type { Opportunity, Stats } from "./components/types";
+import LiveOpsStream from "./components/LiveOpsStream";
 import PageHead from "./components/PageHead";
 import { formatAmount } from "./components/format";
 import { IconShield, IconWallet, IconActivity } from "./components/icons";
@@ -28,8 +26,6 @@ const USDC_MONAD = "0x534b2f3A21130d7a60830c2Df862319e593943A3";
 
 export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null);
-  const [txs, setTxs] = useState<Transaction[] | null>(null);
-  const [intercepts, setIntercepts] = useState<Intercept[] | null>(null);
   const [report, setReport] = useState<EarningsReport | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -39,8 +35,6 @@ export default function Home() {
 
   const reload = () => {
     void fetchStats().then(setStats);
-    void fetchTransactions().then(setTxs);
-    void fetchIntercepts().then(setIntercepts);
     void fetchEarningsReport().then(setReport);
     void fetchOpportunities().then(setOpportunities);
   };
@@ -68,7 +62,6 @@ export default function Home() {
     setBusy(false);
   };
 
-  const events = buildTimeline(txs, intercepts);
   const onchainNet = report?.onchainUsdcToday ?? 0;
   const balance = stats?.walletBalance ?? 0;
   const avoidedLoss = report?.avoidedLossUsdc ?? 0;
@@ -82,7 +75,7 @@ export default function Home() {
     <div className="page">
       <PageHead
         title="今日账本"
-        desc="AI 员工今天赚了多少、花了多少。链上确认收入与演示收入分开记账，亏损单如实显示。"
+        desc="AI 员工的实时经营台：链上确认收入与演示收入分开记账，亏损单如实显示，下方流水即真实账本。"
       />
 
       {/* 第一屏三个数（T8）：净利只算链上确认部分 */}
@@ -141,14 +134,15 @@ export default function Home() {
           alignSelf: "flex-start",
           background: "none",
           border: "none",
+          borderBottom: "1px dotted var(--text-faint)",
           padding: 0,
+          paddingBottom: 2,
           color: "var(--text-dim)",
           fontSize: 12,
           cursor: "pointer",
-          textDecoration: "underline dotted",
         }}
       >
-        演示收入（DEMO BUYER，本地结算）{formatAmount(demoRevenue)} USDC · 今日成本 {formatAmount(todayCost)} USDC
+        演示收入 DEMO BUYER·本地结算 {formatAmount(demoRevenue)} USDC ｜ 今日成本 {formatAmount(todayCost)} USDC
       </button>
 
       {/* 来源面板：任一数字点开看到来源 */}
@@ -290,18 +284,8 @@ export default function Home() {
 
       {flash && <div className="demo-flash">{flash}</div>}
 
-      {/* 时间轴：它做了什么 */}
-      <div className="section">
-        <div className="section-head">
-          <span className="section-title">流水时间轴</span>
-          <span className="section-hint">最新的在最上面</span>
-        </div>
-        {txs === null && intercepts === null ? (
-          <div className="tl-empty">正在读取…</div>
-        ) : (
-          <Timeline events={events} showHashes={false} />
-        )}
-      </div>
+      {/* 实时操作流水：tail -f 真实账本 */}
+      <LiveOpsStream limit={9} />
 
       <div className="trust">
         <IconShield size={14} />
