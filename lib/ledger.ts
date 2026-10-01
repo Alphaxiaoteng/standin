@@ -783,15 +783,18 @@ export class Ledger {
   /**
    * 收入分账：demo（演示买方）与 onchain（链上确认）分别累计，永不相加。
    * dateKey 缺省时不限日期（累计口径）。
+   * T5 之前的遗留收入条目没有 billing 标签，也没有链上证据——归入 demo 口径。
    */
   public getRevenueSplit(dateKey?: string): { demoUsdc: number; onchainUsdc: number } {
     let demoUsdc = 0;
     let onchainUsdc = 0;
     for (const e of this.state.entries) {
       if (dateKey && e.dateKey !== dateKey) continue;
+      const revenue = e.revenueUsdc || 0;
+      if (revenue <= 0) continue;
       const billing = (e.meta as { billing?: unknown } | undefined)?.billing;
-      if (billing === "demo") demoUsdc += e.revenueUsdc || 0;
-      else if (billing === "onchain") onchainUsdc += e.revenueUsdc || 0;
+      if (billing === "onchain") onchainUsdc += revenue;
+      else demoUsdc += revenue;
     }
     return { demoUsdc: round6(demoUsdc), onchainUsdc: round6(onchainUsdc) };
   }
