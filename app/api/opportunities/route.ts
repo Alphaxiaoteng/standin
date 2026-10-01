@@ -16,9 +16,10 @@ import { NextResponse } from "next/server";
 import { ensureSeedBounties } from "@/lib/market/bounties";
 import { scoreOpportunities, sourcesForKind, type SourceHealthInput } from "@/lib/agent/score";
 import { selectOpportunities, type Candidate } from "@/lib/agent/select";
-import { guardStatusOf, initialGuardState, type GuardState } from "@/lib/agent/guard";
+import { guardStatusOf } from "@/lib/agent/guard";
 import { allSourceHealth } from "@/lib/market/health";
 import { getStats } from "@/lib/store";
+import { guardRef } from "@/lib/agent/sopRuntime";
 
 export const dynamic = "force-dynamic";
 
@@ -26,14 +27,12 @@ export const dynamic = "force-dynamic";
 const PER_TRADE_CAP_USDC = 5;
 const DAILY_BUDGET_USDC = 10;
 
-/** dev 模块重复求值时保证 guard 单例 */
-const g = globalThis as unknown as { __standinOpportGuard?: GuardState };
-const guardState = (g.__standinOpportGuard ??= initialGuardState(DAILY_BUDGET_USDC));
-
 export async function GET() {
   const stats = getStats();
   const walletBalanceUsdc = stats.walletBalance;
-  const guard = guardStatusOf(guardState);
+  // 止损状态与 tick 同源（账本 KV 持久化，重启不丢），不再用本路由私有单例
+  const liveGuard = guardRef();
+  const guard = guardStatusOf(liveGuard);
 
   const healthList = allSourceHealth();
   const healthMap: Record<string, SourceHealthInput> = {};
@@ -60,7 +59,7 @@ export async function GET() {
     remainingBudgetUsdc: Math.max(0, DAILY_BUDGET_USDC - guard.spentTodayUsdc),
     balanceUsdc: walletBalanceUsdc,
     pausedKinds: guard.pausedKinds,
-    consecutiveLossesByKind: guardState.consecutiveLossesByKind,
+    consecutiveLossesByKind: liveGuard.consecutiveLossesByKind,
   });
 
   // 选中卡片携带完整打分字段供决策卡展示
