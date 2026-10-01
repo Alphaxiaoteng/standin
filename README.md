@@ -63,7 +63,22 @@ cd contracts
 forge test   # 4 passed（访问控制 / 周期轮转 / 放行成功 / 流氓 Agent 拦截）
 ```
 
-**部署状态**：见 `docs/SUBMISSION.md` §二（含可复现的 `eth_getCode` 核验命令）。我们不预先主张链上证明。
+**部署状态：已真实部署到 Monad Testnet（chainId 10143），非空字节码。**
+
+| 合约 | 地址 | 部署块 | 部署交易 |
+|---|---|---|---|
+| `StandInAnchor` | `0x514047b2a6a06ed8c324b919774b4f751b61c930` | 67217565 | `0x45d41250…b68c` |
+| `PaymentVault` | `0x499707245d853425c1a2b503e5f065acdde89929` | 67217574 | `0xaf09a2d2…bc6f` |
+
+`PaymentVault.anchor()` 读回 `0x5140…c930`（接线正确）。评委可用 RPC 独立复核：
+
+```bash
+curl -s -X POST https://testnet-rpc.monad.xyz -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"eth_getCode","params":["0x514047b2a6a06ed8c324b919774b4f751b61c930","latest"]}'
+# 返回非空字节码（codesize≈2232 字节）—— 证明已部署，非 0x
+```
+
+一份真实拦截裁决已锚定上链：钓鱼剧本（`Recipient mismatch`）的 keccak256 报告哈希 `0x4a84ed18…f933` 通过 `anchor()` 写入区块 67218203，读回 `allowed=false`、`totalBlocked=1`。链上状态与本地 `compareIntent()` 算出的哈希是同一个值。部署证明见 `contracts/broadcast/Deploy.s.sol/10143/run-latest.json`。
 
 ## 运行
 

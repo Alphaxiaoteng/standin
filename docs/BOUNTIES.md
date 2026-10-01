@@ -7,8 +7,9 @@
 本仓库当前可核验的硬事实：
 - 测试：`pnpm vitest run` → 153 passed / 16 files。
 - 构建：`pnpm build` → exit 0，9 业务页面 + 11 API 路由。
-- 合约源码（`contracts/src/`）：`StandInAnchor`（锚定彩排报告哈希 + 放行/拦截裁决）、`PaymentVault`（策略限额内托管本金）。**尚未部署到 Monad testnet** —— 2026-10-01 用 `eth_getCode` 查官方 RPC，两个计划地址（`0xdebc4e…452e` / `0x55446e…3ee6`）均返回空字节码；`contracts/broadcast/` 内 `hash: null`、`receipts: []`，从未广播。
-- 合约测试：`cd contracts && forge test` → **4 passed**（访问控制 / 周期轮转 / 放行成功 / 流氓 Agent 被拦截）。这是当前可主张的最强证明；部署完成前不主张任何链上证据。
+- 合约**已真实部署**到 Monad testnet（chainId 10143，`eth_getCode` 非空字节码）：`StandInAnchor` `0x514047b2a6a06ed8c324b919774b4f751b61c930`（块 67217565，tx `0x45d41250…b68c`）、`PaymentVault` `0x499707245d853425c1a2b503e5f065acdde89929`（块 67217574，tx `0xaf09a2d2…bc6f`）；`vault.anchor()` 读回 `0x5140…c930` 接线正确。部署证明 `contracts/broadcast/Deploy.s.sol/10143/run-latest.json`。
+- 一份真实拦截裁决已上链：钓鱼剧本报告哈希 `0x4a84ed18…f933` 经 `anchor()` 写入块 67218203，链上读回 `allowed=false`、`totalBlocked=1`，与本地 `compareIntent()` 的 keccak256 同值。
+- 合约测试：`cd contracts && forge test` → **4 passed**（访问控制 / 周期轮转 / 放行成功 / 流氓 Agent 被拦截）。
 
 核心门禁实现（下面反复引用）：
 - `lib/rehearse.ts` `compareIntent()`：声明意图 vs 实际 calldata 逐字段比对（action / token / 收款方 / 金额超出 / 无限授权）。

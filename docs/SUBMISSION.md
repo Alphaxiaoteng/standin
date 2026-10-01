@@ -25,7 +25,7 @@
 | 止损在 Agent 之外强制：当日净亏 ≥30% 停手、连亏 3 单暂停类型、单笔超上限直拒 | `lib/agent/guard.ts`（`DAILY_LOSS_HALT_FRACTION = 0.3`） |
 | 账本持久化带回滚：落盘 `.data/ledger.json`，原子写（临时文件 + `renameSync`），写失败回滚内存态并停机 | `lib/ledger.ts` `flush()` / `withRollback()` / `setHalted()`；`grep -n "renameSync" lib/ledger.ts` |
 | 链上金库状态机（合约源码）：放款只认 Anchor 中 `allowed=true` 的报告，并强校验 Agent 身份、策略限额、周期限额、余额；`forge test` 4 passed | `contracts/src/PaymentVault.sol` `release()`；`contracts/src/StandInAnchor.sol` |
-| 合约部署状态 | **未部署**。`contracts/broadcast/...run-latest.json` 内 `hash: null`、`receipts: []`（未广播）；2026-10-01 `eth_getCode` 查官方 RPC，计划地址 `0xdebc4e…452e` / `0x55446e…3ee6` 均返回 `0x`。源码与测试可核验，链上证据不存在 |
+| 合约部署状态 | **已部署**。`StandInAnchor` `0x514047b2a6a06ed8c324b919774b4f751b61c930`（块 67217565，tx `0x45d41250…b68c`）、`PaymentVault` `0x499707245d853425c1a2b503e5f065acdde89929`（块 67217574，tx `0xaf09a2d2…bc6f`）；`vault.anchor()` 接线正确。`eth_getCode` 返回非空字节码（codesize 2232 / 3561）。一份拦截裁决已锚定（块 67218203，`allowed=false`）。部署证明 `contracts/broadcast/Deploy.s.sol/10143/run-latest.json`。 |
 | CI 合约流水线 | `contracts/.github/workflows/test.yml`（Foundry fmt/build/test） |
 
 诚实说明：提交范围即 `git ls-files` 所列内容；`lib/long-running-app-harness/`、`lib/cluster/`、`lib/monitoring/` 为无关脚手架，已按 `.gitignore` 排除且不参与 vitest；`docs/FINAL_ACCEPTANCE_REPORT.md` / `IMPLEMENTATION_SUMMARY.md` / `COMPLETE_GUIDE.md` / `SECURITY_AUDIT.md` 描述的是上述被排除模块，不作为本次提交的技术依据。
@@ -71,14 +71,14 @@
 | 官方要求项 | 状态 | 证据 / 待办 |
 |---|---|---|
 | 项目名与 Tagline | 已完成 | 本文档顶部 |
-| 方案介绍与 Why Monad | 已完成（见本文档 §三） | 高吞吐低成本的 EVM 测试网让「每笔彩排报告都先比对意图再放款」在演示规模下可行。**注意：合约尚未部署，不要引用 `contracts/broadcast/` 作为已部署地址来源** |
+| 方案介绍与 Why Monad | 已完成（见本文档 §三） | 高吞吐低成本的 EVM 测试网让「每笔彩排报告都先比对意图再放款」在演示规模下可行。合约已部署到 10143（见 §一.1 部署状态行），链上锚定已通过钓鱼拦截交易验证。 |
 | Demo 视频（2-3 分钟） | **待完成** | 按 `docs/DEMO_SCRIPT.md`（3:08 逐镜脚本）录制；**官方规则禁止 AI 合成语音，必须真人解说** |
 | Live Demo URL | **待完成** | 仓库已含完整 Next.js 生产构建（`pnpm build` exit 0）；需登录 Vercel/Railway 一键部署（CLI 已装但无凭据，见阻塞项） |
 | 代码仓库（公开） | ✅ 已完成 | https://github.com/Alphaxiaoteng/standin （public，20 commit 全量增量历史，评委可逐条核验六周内构建） |
-| 部署证明与交易哈希 | **未完成** | 无链上证明。`contracts/broadcast/...run-latest.json` 内 `hash: null`、`receipts: []`（从未广播）；2026-10-01 `eth_getCode` 查官方 RPC，两个计划地址均返回 `0x`。可主张的是合约源码 + `forge test` 4 passed |
+| 部署证明与交易哈希 | ✅ **已完成** | 两合约已真实部署（`eth_getCode` 非空字节码），部署交易哈希与块号见 §一.1 部署状态行。一份拦截裁决已锚定上链（块 67218203，`allowed=false`）。评委可运行 `curl` 命令独立复核。 |
 | 测试与构建快照 | 已完成 | `pnpm vitest run` 153 passed / 16 files；`cd contracts && forge test` 4 passed；`pnpm build` exit 0 |
 
-**立即待办（按优先级）**：① 领测试币并部署两合约（水龙头全部需要浏览器人机验证，CLI 程序化领取已证实不可行——Alchemy 返回 `CAPTCHA verification is required / no server-to-server credential`）；② 部署 Live Demo（`npx vercel login` 后 `npx vercel deploy --prod`）；③ 按 `docs/DEMO_SCRIPT.md` 录制真人解说视频；④ 合约上链后回填真实 tx 哈希。
+**立即待办（按优先级）**：① 部署 Live Demo（`npx vercel login` 后 `npx vercel deploy --prod`）；② 按 `docs/DEMO_SCRIPT.md` 录制真人解说视频；③ 合约上链后回填真实 tx 哈希（**已完成**）。
 
 ---
 
