@@ -19,10 +19,10 @@ import {
 import { getLedger, settle } from "../ledger";
 
 const USDC_DECIMALS = 6;
-/** eth_getLogs 单段扫描的最大区块数（provider 窗口通常 100–1000，留余量） */
-const SCAN_STEP = 900;
-/** 单次轮询最多扫描的区块总量，防止首次回扫拖垮请求 */
-const MAX_SCAN_BLOCKS = 90_000;
+/** eth_getLogs 单段扫描的区块数：2026-10-01 实测 testnet-rpc.monad.xyz 限制 100 块窗口 */
+const SCAN_STEP = 90;
+/** 单次轮询最多扫描的区块总量（90/段 × 100 段），防止首次回扫拖垮请求 */
+const MAX_SCAN_BLOCKS = 9_000;
 
 export function agentAddress(): `0x${string}` | null {
   const raw = process.env.STANDIN_AGENT_ADDRESS;
@@ -68,16 +68,17 @@ export async function timestampToBlock(
   client: MinimalClient,
   sinceMs: number,
 ): Promise<bigint> {
+  const sinceSec = Math.floor(sinceMs / 1000);
   const latest = await client.getBlockNumber();
   const latestTs = (await client.getBlock({ blockNumber: latest })).timestamp;
-  if (BigInt(sinceMs / 1000) >= latestTs) return latest + 1n;
+  if (BigInt(sinceSec) >= latestTs) return latest + 1n;
 
   let lo = 0n;
   let hi = latest;
   while (lo < hi) {
     const mid = (lo + hi) / 2n;
     const ts = (await client.getBlock({ blockNumber: mid })).timestamp;
-    if (ts >= sinceMs / 1000) hi = mid;
+    if (ts >= BigInt(sinceSec)) hi = mid;
     else lo = mid + 1n;
   }
   return lo;

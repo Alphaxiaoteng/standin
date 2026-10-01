@@ -98,4 +98,11 @@ describe("findPayment（链上付款回执匹配）", () => {
     expect(ts >= SINCE / 1000).toBe(true);
     if (prev !== null) expect(prev < SINCE / 1000).toBe(true);
   });
+
+  it("handles non-whole-second timestamps without BigInt errors", async () => {
+    // 回归：1790245352.396 这类毫秒精度时间戳曾被直接 BigInt() 转换而抛错
+    const client = fakeClient([]);
+    const bn = await timestampToBlock(client, SINCE + 396);
+    expect(bn).toBeTypeOf("bigint");
+  });
 });
