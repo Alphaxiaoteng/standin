@@ -9,6 +9,11 @@ const COINGECKO_URL =
   "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd"
 const COINBASE_URL = "https://api.coinbase.com/v2/prices"
 const HN_URL = "https://hacker-news.firebaseio.com/v0"
+const KRAKEN_URL = "https://api.kraken.com/0/public/Ticker"
+
+// 2026-10-01 实测（HTTP 200）：pair=XBTUSD → result["XXBTZUSD"].c[0]；
+// pair=ETHUSD → result["XETHZUSD"].c[0]；业务错误也返回 HTTP 200，须检查 error 数组。
+const KRAKEN_PAIR: Record<CoinbasePair, string> = { "BTC-USD": "XBTUSD", "ETH-USD": "ETHUSD" }
 
 export interface SourceDeps {
   fetch?: typeof fetch
@@ -85,6 +90,28 @@ export async function fetchCoinbaseSpot(
   if (!res.ok) return res
   const body = res.body as { data?: { amount?: unknown } }
   const usd = num(body?.data?.amount)
+  if (usd === null) {
+    return { ok: false, error: "响应无法解析", fetchedAt: res.fetchedAt, latencyMs: res.latencyMs }
+  }
+  return { ok: true, value: { pair, usd }, fetchedAt: res.fetchedAt, latencyMs: res.latencyMs }
+}
+
+export async function fetchKrakenSpot(
+  pair: CoinbasePair,
+  deps: SourceDeps = {},
+): Promise<SourceResult<{ pair: CoinbasePair; usd: number }>> {
+  const res = await attempt(`${KRAKEN_URL}?pair=${KRAKEN_PAIR[pair]}`, deps)
+  if (!res.ok) return res
+  const body = res.body as {
+    error?: unknown
+    result?: Record<string, { c?: unknown } | undefined>
+  }
+  if (Array.isArray(body?.error) && body.error.length > 0) {
+    return { ok: false, error: `Kraken ${String(body.error[0])}`, fetchedAt: res.fetchedAt, latencyMs: res.latencyMs }
+  }
+  const ticker = body?.result ? Object.values(body.result)[0] : undefined
+  const last = ticker && Array.isArray(ticker.c) ? (ticker.c as unknown[])[0] : undefined
+  const usd = num(last)
   if (usd === null) {
     return { ok: false, error: "响应无法解析", fetchedAt: res.fetchedAt, latencyMs: res.latencyMs }
   }

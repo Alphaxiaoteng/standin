@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fetchCoinbaseSpot, fetchCoingeckoPrices, fetchHnTop } from "./sources";
+import { fetchCoinbaseSpot, fetchCoingeckoPrices, fetchHnTop, fetchKrakenSpot } from "./sources";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -101,6 +101,57 @@ describe("fetchCoinbaseSpot", () => {
     expect(out.ok).toBe(false);
     if (out.ok) return;
     expect(out.error).toBe("超时");
+  });
+});
+
+describe("fetchKrakenSpot", () => {
+  // 响应结构取自 2026-10-01 实测：{"error":[],"result":{"XXBTZUSD":{"c":["83838.20000","0.0001"],...}}}
+  const krakenBody = (pairKey: string, last: string) => ({
+    error: [],
+    result: { [pairKey]: { a: [last, "1", "1.000"], b: [last, "1", "1.000"], c: [last, "0.00010000"] } },
+  });
+
+  it("parses XBTUSD last trade price and requests the mapped pair", async () => {
+    let url = "";
+    const out = await fetchKrakenSpot("BTC-USD", {
+      now: () => 4_000,
+      fetch: async (input) => {
+        url = String(input);
+        return jsonResponse(krakenBody("XXBTZUSD", "83838.20000"));
+      },
+    });
+    expect(url).toContain("pair=XBTUSD");
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.value).toEqual({ pair: "BTC-USD", usd: 83838.2 });
+    expect(out.fetchedAt).toBe(4_000);
+  });
+
+  it("parses ETHUSD via XETHZUSD key", async () => {
+    const out = await fetchKrakenSpot("ETH-USD", {
+      fetch: async () => jsonResponse(krakenBody("XETHZUSD", "2694.00000")),
+    });
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.value.usd).toBe(2694);
+  });
+
+  it("fails on Kraken business errors even when HTTP is 200", async () => {
+    const out = await fetchKrakenSpot("ETH-USD", {
+      fetch: async () => jsonResponse({ error: ["EQuery:Unknown asset pair"], result: {} }),
+    });
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.error).toContain("EQuery");
+  });
+
+  it("returns 源限流 on 429", async () => {
+    const out = await fetchKrakenSpot("BTC-USD", {
+      fetch: async () => new Response("", { status: 429 }),
+    });
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.error).toBe("源限流");
   });
 });
 

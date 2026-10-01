@@ -17,6 +17,14 @@ function brief(over: Partial<BriefSnapshot> = {}): BriefSnapshot {
   };
 }
 
+function withKraken(snap: BriefSnapshot, btcUsd: number, ethUsd = 2_000): BriefSnapshot {
+  return {
+    ...snap,
+    btc: { ...snap.btc, kraken: quote(1_000, btcUsd) },
+    eth: { ...snap.eth, kraken: quote(1_000, ethUsd) },
+  };
+}
+
 /** 中点价 10000 时，价差基点 = |高-低|。 */
 function btcAtSpread(bps: number) {
   const mid = 10_000;
@@ -65,6 +73,33 @@ describe("verifyBrief", () => {
     const over = verifyBrief(brief({ btc: btcAtSpread(50.1) }), DELIVERED);
     expect(over.passed).toBe(false);
     expect(over.reasons.some((r) => r.includes("基点"))).toBe(true);
+  });
+
+  it("passes when three sources agree inside the band", () => {
+    const out = verifyBrief(withKraken(brief(), 10_000), DELIVERED);
+    expect(out.passed).toBe(true);
+    expect(out.degraded).toBeFalsy();
+  });
+
+  it("fails and names the source when one deviates from the three-source median", () => {
+    // CoinGecko 10000, Coinbase 10000, Kraken 10120 → 中位数 10000，Kraken 偏离 120bps
+    const out = verifyBrief(withKraken(brief(), 10_120), DELIVERED);
+    expect(out.passed).toBe(false);
+    expect(out.reasons.some((r) => r.includes("Kraken") && r.includes("中位数"))).toBe(true);
+  });
+
+  it("degrades to the two-source rule when kraken is missing and says so", () => {
+    const out = verifyBrief(brief(), DELIVERED);
+    expect(out.passed).toBe(true);
+    expect(out.degraded).toContain("降级");
+    expect(out.degraded).toContain("Kraken");
+  });
+
+  it("keeps flagging a two-source breach even when degraded", () => {
+    const out = verifyBrief(brief({ btc: btcAtSpread(80) }), DELIVERED);
+    expect(out.passed).toBe(false);
+    expect(out.reasons.some((r) => r.includes("两源价差"))).toBe(true);
+    expect(out.degraded).toContain("降级");
   });
 
   it("fails when a headline is not on the board", () => {

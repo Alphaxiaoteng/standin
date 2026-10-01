@@ -135,7 +135,7 @@ interface Registry {
 const globalForHealth = globalThis as unknown as { __standinHealthTrackers?: Registry };
 const registry: Registry = (globalForHealth.__standinHealthTrackers ??= { trackers: new Map() });
 
-export const DATA_SOURCES = ["coingecko", "coinbase", "hn"] as const;
+export const DATA_SOURCES = ["coingecko", "coinbase", "kraken", "hn"] as const;
 export type DataSourceName = (typeof DATA_SOURCES)[number];
 
 export function getTracker(name: string): SourceHealthTracker {

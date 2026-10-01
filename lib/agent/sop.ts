@@ -8,7 +8,7 @@
 import { sourcesForKind, scoreOpportunity, coldStartPosterior, type BetaPosterior, type SourceHealthInput } from "./score";
 import { selectOpportunities, type Candidate, type Selected } from "./select";
 import { canTrade, settleTrade, guardStatusOf, type GuardState } from "./guard";
-import { verifyBrief, verifySpreadWatch, spreadBps, type BriefSnapshot, type SpreadSample } from "./verify";
+import { verifyBrief, verifySpreadWatch, spreadBps, medianDeviationBps, type BriefSnapshot, type SpreadSample } from "./verify";
 import type { Bounty, BountyKind } from "../market/bounties";
 
 export type SopStepName = "发现" | "打分" | "选择" | "门禁" | "执行" | "验收" | "结算" | "复盘";
@@ -169,30 +169,42 @@ export function memoryPosteriorPort(store: Map<BountyKind, BetaPosterior> = empt
 
 function briefChecks(snapshot: BriefSnapshot | undefined, deliveredAt: number): Array<{ label: string; passed: boolean }> {
   if (!snapshot) return [];
-  const pairs: Array<[string, { usd: number; fetchedAt: number } | undefined]> = [
-    ["BTC CoinGecko", snapshot.btc?.coingecko],
-    ["BTC Coinbase", snapshot.btc?.coinbase],
-    ["ETH CoinGecko", snapshot.eth?.coingecko],
-    ["ETH Coinbase", snapshot.eth?.coinbase],
+  const coins: Array<[string, BriefSnapshot["btc"] | undefined]> = [
+    ["BTC", snapshot.btc],
+    ["ETH", snapshot.eth],
   ];
+  const pairs: Array<[string, { usd: number; fetchedAt: number } | undefined]> = [];
+  for (const [coin, cq] of coins) {
+    for (const source of ["CoinGecko", "Coinbase", "Kraken"]) {
+      const key = source.toLowerCase() as "coingecko" | "coinbase" | "kraken";
+      pairs.push([`${coin} ${source}`, cq?.[key]]);
+    }
+  }
   const checks: Array<{ label: string; passed: boolean }> = pairs.map(([label, q]) => ({
     label: `${label} 报价存在`,
-    passed: !!q,
+    // Kraken 为第三方交叉校验源，缺失允许降级，不算报价缺失
+    passed: label.endsWith("Kraken") ? true : !!q,
   }));
   for (const [label, q] of pairs) {
-    if (q) checks.push({ label: `${label} 新鲜度 ≤ 60s`, passed: deliveredAt - q.fetchedAt <= MAX_AGE_MS });
+    if (q && !label.endsWith("Kraken")) {
+      checks.push({ label: `${label} 新鲜度 ≤ 60s`, passed: deliveredAt - q.fetchedAt <= MAX_AGE_MS });
+    }
   }
-  if (snapshot.btc?.coingecko && snapshot.btc?.coinbase) {
-    checks.push({
-      label: "BTC 两源价差 ≤ 50bps",
-      passed: spreadBps(snapshot.btc.coingecko.usd, snapshot.btc.coinbase.usd) <= MAX_SPREAD_BPS,
-    });
-  }
-  if (snapshot.eth?.coingecko && snapshot.eth?.coinbase) {
-    checks.push({
-      label: "ETH 两源价差 ≤ 50bps",
-      passed: spreadBps(snapshot.eth.coingecko.usd, snapshot.eth.coinbase.usd) <= MAX_SPREAD_BPS,
-    });
+  for (const [coin, cq] of coins) {
+    if (cq?.coingecko && cq?.coinbase && cq?.kraken) {
+      const median = [cq.coingecko.usd, cq.coinbase.usd, cq.kraken.usd].sort((a, b) => a - b)[1];
+      const worst = Math.max(
+        medianDeviationBps(cq.coingecko.usd, median),
+        medianDeviationBps(cq.coinbase.usd, median),
+        medianDeviationBps(cq.kraken.usd, median),
+      );
+      checks.push({ label: `${coin} 三源中位数偏差 ≤ 50bps`, passed: worst <= MAX_SPREAD_BPS });
+    } else if (cq?.coingecko && cq?.coinbase) {
+      checks.push({
+        label: `${coin} 两源价差 ≤ 50bps（降级）`,
+        passed: spreadBps(cq.coingecko.usd, cq.coinbase.usd) <= MAX_SPREAD_BPS,
+      });
+    }
   }
   checks.push({
     label: `热点 ${HEADLINE_COUNT} 条且可回查`,

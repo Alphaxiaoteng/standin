@@ -33,6 +33,7 @@ import {
 import {
   fetchCoingeckoPrices,
   fetchCoinbaseSpot,
+  fetchKrakenSpot,
   fetchHnTop,
 } from "../market/sources";
 import { getStats, recordSpend } from "../store";
@@ -69,8 +70,16 @@ function runtime(): SopRuntime {
 
 async function fetchQuote(
   coin: "btc" | "eth",
-): Promise<{ coingecko?: { usd: number; fetchedAt: number }; coinbase?: { usd: number; fetchedAt: number } }> {
-  const out: { coingecko?: { usd: number; fetchedAt: number }; coinbase?: { usd: number; fetchedAt: number } } = {};
+): Promise<{
+  coingecko?: { usd: number; fetchedAt: number };
+  coinbase?: { usd: number; fetchedAt: number };
+  kraken?: { usd: number; fetchedAt: number };
+}> {
+  const out: {
+    coingecko?: { usd: number; fetchedAt: number };
+    coinbase?: { usd: number; fetchedAt: number };
+    kraken?: { usd: number; fetchedAt: number };
+  } = {};
 
   const cg = await fetchCoingeckoPrices();
   if (cg.ok) {
@@ -81,12 +90,22 @@ async function fetchQuote(
     recordFailure("coingecko", cg.error, cg.latencyMs);
   }
 
-  const cb = await fetchCoinbaseSpot(coin === "btc" ? "BTC-USD" : "ETH-USD");
+  const pair = coin === "btc" ? "BTC-USD" : "ETH-USD";
+  const cb = await fetchCoinbaseSpot(pair);
   if (cb.ok) {
     recordSuccess("coinbase", cb.latencyMs);
     out.coinbase = { usd: cb.value.usd, fetchedAt: cb.fetchedAt };
   } else {
     recordFailure("coinbase", cb.error, cb.latencyMs);
+  }
+
+  // 第三方交叉校验源：失败只降级（验收回退两源规则），不中断执行
+  const kr = await fetchKrakenSpot(pair);
+  if (kr.ok) {
+    recordSuccess("kraken", kr.latencyMs);
+    out.kraken = { usd: kr.value.usd, fetchedAt: kr.fetchedAt };
+  } else {
+    recordFailure("kraken", kr.error, kr.latencyMs);
   }
 
   return out;
@@ -112,8 +131,8 @@ const executor = {
         return { ok: false as const, error: "数据源失败（见健康度面板）" };
       }
       const snapshot: BriefSnapshot = {
-        btc: { coingecko: btc.coingecko, coinbase: btc.coinbase },
-        eth: { coingecko: eth.coingecko, coinbase: eth.coinbase },
+        btc: { coingecko: btc.coingecko, coinbase: btc.coinbase, kraken: btc.kraken },
+        eth: { coingecko: eth.coingecko, coinbase: eth.coinbase, kraken: eth.kraken },
         headlines: hn.titles,
         // 榜单不由执行阶段提供：验收阶段独立回查后再填入，杜绝"自己验证自己"
         hnBoard: [],

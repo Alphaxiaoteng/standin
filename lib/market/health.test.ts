@@ -160,7 +160,7 @@ describe("shared registry", () => {
     resetHealthRegistry();
     recordSuccess("coingecko", 100, 1);
     const all = allSourceHealth();
-    expect(all.map((s) => s.name).sort()).toEqual(["coinbase", "coingecko", "hn"]);
+    expect(all.map((s) => s.name).sort()).toEqual(["coinbase", "coingecko", "hn", "kraken"]);
     expect(all.every((s) => s.healthy)).toBe(true);
   });
 });
