@@ -161,4 +161,14 @@ describe("verifySpreadWatch", () => {
     expect(out.passed).toBe(false);
     expect(out.reasons.some((r) => r.includes("未按时通知"))).toBe(true);
   });
+
+  it("fails when the breach was never notified (无独立通知)", () => {
+    const out = verifySpreadWatch({
+      ...window,
+      samples: [{ spreadBps: 80, at: 10_000 }],
+      notifiedAt: null,
+    });
+    expect(out.passed).toBe(false);
+    expect(out.reasons.some((r) => r.includes("未按时通知"))).toBe(true);
+  });
 });

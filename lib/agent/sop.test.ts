@@ -310,6 +310,59 @@ describe("runSopTick board recheck (验收阶段独立回查榜单)", () => {
   });
 });
 
+describe("runSopTick spread_watch 通知回放（验收只认独立通知存储）", () => {
+  function spreadBounty(): Bounty {
+    return sampleBounty({ id: "bnty-sp", kind: "spread_watch", title: "BTC 双源价差监测", toleranceBps: 50 });
+  }
+
+  function spreadResult(notifiedAt: number | null): ExecuteResult {
+    return {
+      ok: true,
+      // 验收窗口为 [deliveredAt, deliveredAt]，采样须恰在 NOW 才算窗口内
+      samples: [{ spreadBps: 80, at: NOW }],
+      notifiedAt,
+    };
+  }
+
+  function spreadRig(executorResult: ExecuteResult): TestRig {
+    return createRig({
+      bounties: [spreadBounty()],
+      executorResult,
+    });
+  }
+
+  const spreadReq: SopTickRequest = { kind: "spread_watch", perTradeCapUsdc: 5, dailyBudgetUsdc: 10 };
+
+  it("passes when the breach was notified in the independent store", async () => {
+    const rig = spreadRig(spreadResult(NOW));
+    rig.deps.notices = { latestFor: (id) => (id === "bnty-sp" ? { at: NOW } : null) };
+
+    const res = await runSopTick(spreadReq, rig.deps);
+    expect(res.ok).toBe(true);
+    expect(res.task.status).toBe("passed");
+  });
+
+  it("fails when the store has no notice even though the executor claims one (防自证)", async () => {
+    const rig = spreadRig(spreadResult(NOW));
+    rig.deps.notices = { latestFor: () => null };
+
+    const res = await runSopTick(spreadReq, rig.deps);
+    expect(res.ok).toBe(false);
+    expect(res.task.status).toBe("failed");
+    expect(res.task.failReason).toContain("未按时通知");
+    expect(rig.ledgerEntries[0]).toMatchObject({ status: "FAILED", revenueUsdc: 0 });
+  });
+
+  it("fails when the notice timestamp falls outside the window", async () => {
+    const rig = spreadRig(spreadResult(null));
+    rig.deps.notices = { latestFor: () => ({ at: NOW + 999_999 }) };
+
+    const res = await runSopTick(spreadReq, rig.deps);
+    expect(res.ok).toBe(false);
+    expect(res.task.failReason).toContain("未按时通知");
+  });
+});
+
 describe("runSopTick ledger crash rollback (PRD §四 结算回滚并停机)", () => {
   it("rolls back wallet debit when ledger write fails, prohibiting further spend", async () => {
     const rig = createRig({ throwOnLedgerSettle: true });

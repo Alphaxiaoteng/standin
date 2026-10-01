@@ -38,6 +38,7 @@ import {
 } from "../market/sources";
 import { getStats, recordSpend } from "../store";
 import { settle } from "../ledger";
+import { emitNotice, latestNoticeFor } from "./notify";
 import type { BriefSnapshot, SpreadSample } from "./verify";
 
 function delay(ms: number): Promise<void> {
@@ -112,7 +113,7 @@ async function fetchQuote(
 }
 
 const executor = {
-  async execute(kind: BountyKind, opts: { windowSec: number; toleranceBps: number | null }) {
+  async execute(kind: BountyKind, opts: { bountyId?: string; windowSec: number; toleranceBps: number | null }) {
     if (kind === "data_brief") {
       const [btc, eth, hn] = await Promise.all([
         fetchQuote("btc"),
@@ -151,7 +152,19 @@ const executor = {
         const mid = (btc.coingecko.usd + btc.coinbase.usd) / 2;
         const bps = mid > 0 ? (Math.abs(btc.coingecko.usd - btc.coinbase.usd) / mid) * 10_000 : Infinity;
         samples.push({ spreadBps: Math.round(bps * 100) / 100, at: Date.now() });
-        if (bps > (opts.toleranceBps ?? 50) && notifiedAt === null) notifiedAt = Date.now();
+        // 通知走独立通道（notices.json），时间戳以写入时刻为准；写失败不视为已通知
+        if (bps > (opts.toleranceBps ?? 50) && notifiedAt === null && opts.bountyId) {
+          try {
+            const n = await emitNotice(opts.bountyId, {
+              spreadBps: Math.round(bps * 100) / 100,
+              toleranceBps: opts.toleranceBps ?? 50,
+              sampledAt: Date.now(),
+            });
+            notifiedAt = n.at;
+          } catch {
+            // 通知写失败：保持 null，验收将如实判"未按时通知"
+          }
+        }
       }
       if (samples.length < 6) {
         await delay(Math.max(2_000, Math.floor(windowMs / 6)));
@@ -210,6 +223,13 @@ function buildDeps(rt: SopRuntime): SopDeps {
         }
         recordSuccess("hn", r.latencyMs);
         return { board: r.value.board, fetchedAt: r.fetchedAt };
+      },
+    },
+    notices: {
+      // 验收只认通知存储里的时间戳（漏洞 B：执行器自带 notifiedAt 不再作为证据）
+      latestFor(bountyId) {
+        const n = latestNoticeFor(bountyId);
+        return n ? { at: n.at } : null;
       },
     },
     guard: rt.guard,

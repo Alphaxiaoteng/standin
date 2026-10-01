@@ -79,7 +79,15 @@ export interface ExecuteResult {
 }
 
 export interface ExecutorPort {
-  execute(kind: BountyKind, opts: { windowSec: number; toleranceBps: number | null }): Promise<ExecuteResult>;
+  execute(
+    kind: BountyKind,
+    opts: { bountyId?: string; windowSec: number; toleranceBps: number | null },
+  ): Promise<ExecuteResult>;
+}
+
+/** 独立通知回放：验收阶段从通知存储读时间戳，不信任执行器自带的 notifiedAt */
+export interface NoticeReplayPort {
+  latestFor(bountyId: string): { at: number } | null;
 }
 
 export interface SopDeps {
@@ -91,6 +99,8 @@ export interface SopDeps {
   executor: ExecutorPort;
   /** data_brief 验收阶段独立回查榜单；缺省时沿用快照自带的 hnBoard（仅测试用） */
   boardRecheck?: BoardRecheckPort;
+  /** spread_watch 验收阶段从通知存储回放时间戳；缺省时沿用执行器返回值（仅测试用） */
+  notices?: NoticeReplayPort;
   /** 调用方持有；本函数结算时用 settleTrade 更新（Object.assign 回写） */
   guard: GuardState;
   now?: () => number;
@@ -215,12 +225,12 @@ function briefChecks(snapshot: BriefSnapshot | undefined, deliveredAt: number): 
   return checks;
 }
 
-function spreadWatchChecks(ex: ExecuteResult, toleranceBps: number | null, nowMs: number): Array<{ label: string; passed: boolean }> {
+function spreadWatchChecks(ex: ExecuteResult, toleranceBps: number | null, nowMs: number, notifiedAt: number | null): Array<{ label: string; passed: boolean }> {
   const threshold = toleranceBps ?? MAX_SPREAD_BPS;
   const windowStart = nowMs - 0; // 窗口由 executor 采样覆盖，这里只判定采样本身
   void windowStart;
   const triggered = (ex.samples ?? []).some((s) => s.spreadBps > threshold);
-  const onTime = ex.notifiedAt !== null && ex.notifiedAt !== undefined;
+  const onTime = notifiedAt !== null;
   return [
     { label: `窗口内价差越过 ${threshold}bps`, passed: triggered },
     { label: "按时通知", passed: onTime },
@@ -232,6 +242,7 @@ function verifyChecks(
   ex: ExecuteResult,
   toleranceBps: number | null,
   deliveredAt: number,
+  notifiedAt: number | null,
 ): { verdict: { passed: boolean; reasons: string[] }; checks: Array<{ label: string; passed: boolean }> } {
   if (kind === "data_brief") {
     const verdict = verifyBrief(ex.snapshot as BriefSnapshot, deliveredAt);
@@ -246,9 +257,9 @@ function verifyChecks(
     thresholdBps: toleranceBps ?? MAX_SPREAD_BPS,
     windowStart: deliveredAt - 0,
     windowEnd: deliveredAt,
-    notifiedAt: ex.notifiedAt ?? null,
+    notifiedAt,
   });
-  return { verdict, checks: spreadWatchChecks(ex, toleranceBps, deliveredAt) };
+  return { verdict, checks: spreadWatchChecks(ex, toleranceBps, deliveredAt, notifiedAt) };
 }
 
 function baseTask(bounty: Bounty, status: SopTaskStatus, balance: number): SopTickResult["task"] {
@@ -415,7 +426,7 @@ export async function runSopTick(req: SopTickRequest, deps: SopDeps): Promise<So
     return terminalResult({ bounty, status: "skipped", reason, steps, decision, balance: deps.wallet.balanceUsdc() });
   }
   steps.push(step("执行", "ok", `已扣成本 ${bounty.costUsdc}，开始采集`));
-  const ex = await deps.executor.execute(bounty.kind, { windowSec: bounty.windowSec, toleranceBps: bounty.toleranceBps });
+  const ex = await deps.executor.execute(bounty.kind, { bountyId: bounty.id, windowSec: bounty.windowSec, toleranceBps: bounty.toleranceBps });
   if (!ex.ok) {
     const reason = `数据源失败：${ex.error ?? "未知错误"}，成本已花，记亏`;
     steps.push(step("执行", "fail", reason));
@@ -441,7 +452,7 @@ export async function runSopTick(req: SopTickRequest, deps: SopDeps): Promise<So
     };
   }
 
-  /* 6. 验收（data_brief 的榜单独立回查发生在本阶段，与执行阶段抓取相互独立） */
+  /* 6. 验收（data_brief 榜单回查、spread_watch 通知回放都发生在本阶段，与执行相互独立） */
   const deliveredAt = now();
   let boardRecheckFailed = false;
   if (bounty.kind === "data_brief" && deps.boardRecheck) {
@@ -453,7 +464,14 @@ export async function runSopTick(req: SopTickRequest, deps: SopDeps): Promise<So
       boardRecheckFailed = true;
     }
   }
-  let { verdict, checks } = verifyChecks(bounty.kind, ex, bounty.toleranceBps, deliveredAt);
+  // 通知时间只信独立通知存储；存储里读不到就是"未按时通知"
+  let spreadWatchNotifiedAt: number | null = null;
+  if (bounty.kind === "spread_watch") {
+    spreadWatchNotifiedAt = deps.notices
+      ? deps.notices.latestFor(bounty.id)?.at ?? null
+      : ex.notifiedAt ?? null;
+  }
+  let { verdict, checks } = verifyChecks(bounty.kind, ex, bounty.toleranceBps, deliveredAt, spreadWatchNotifiedAt);
   if (boardRecheckFailed) {
     verdict = { passed: false, reasons: ["无法独立回查榜单", ...verdict.reasons] };
     checks = [...checks, { label: "独立回查榜单", passed: false }];
