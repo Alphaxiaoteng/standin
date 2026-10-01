@@ -85,6 +85,17 @@ export default function Home() {
         desc="AI 员工今天赚了多少、花了多少。链上确认收入与演示收入分开记账，亏损单如实显示。"
       />
 
+      {/* 门禁演示直达：评委第一眼看到的应该是「它能拦住」，90 秒故事从这进 */}
+      <div className="demo" style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 13 }}>
+          <strong>30 秒看懂 StandIn：</strong>恶意调用当场拦截，合规调用逐字段一致才放行
+        </span>
+        <span style={{ flex: 1 }} />
+        <Link href="/guardrail" className="btn btn-primary" style={{ textDecoration: "none" }}>
+          打开门禁演示 →
+        </Link>
+      </div>
+
       {/* 第一屏三个数（T8）：净利只算链上确认部分 */}
       <div className="summary">
         <button
