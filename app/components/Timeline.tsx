@@ -60,7 +60,7 @@ function Copy({ text }: { text: string }) {
   );
 }
 
-export function Timeline({ events }: { events: TimelineEvent[] }) {
+export function Timeline({ events, showHashes = true }: { events: TimelineEvent[]; showHashes?: boolean }) {
   if (events.length === 0) {
     return <div className="tl-empty">还没有动态。运行一次任务后，这里会按顺序记录它做的每一件事。</div>;
   }
@@ -87,10 +87,12 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
                 </p>
                 <div className="tl-meta">
                   <span>{who.hint}</span>
-                  <span className="tl-hash">
-                    流水 {truncateHash(t.txHash, 8, 6)}
-                    <Copy text={t.txHash} />
-                  </span>
+                  {showHashes && (
+                    <span className="tl-hash">
+                      流水 {truncateHash(t.txHash, 8, 6)}
+                      <Copy text={t.txHash} />
+                    </span>
+                  )}
                 </div>
               </div>
             </li>
@@ -130,7 +132,7 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
                     <span className="tl-cmp-bad">无限额度 (2²⁵⁶-1)</span>
                   </div>
                 </div>
-              ) : (
+              ) : showHashes ? (
                 <div className="tl-compare">
                   <div>
                     <span className="tl-cmp-label">原本要付给</span>
@@ -141,15 +143,17 @@ export function Timeline({ events }: { events: TimelineEvent[] }) {
                     <span className="tl-cmp-bad">{truncateHash(i.actualTo, 8, 6)}</span>
                   </div>
                 </div>
-              )}
+              ) : null}
               <div className="tl-foot">
                 <span className="tl-saved">
                   <IconShield size={12} /> 资金未损失，已阻止
                 </span>
-                <span className="tl-hash">
-                  报告 {truncateHash(i.reportHash, 8, 6)}
-                  <Copy text={i.reportHash} />
-                </span>
+                {showHashes && (
+                  <span className="tl-hash">
+                    报告 {truncateHash(i.reportHash, 8, 6)}
+                    <Copy text={i.reportHash} />
+                  </span>
+                )}
               </div>
             </div>
           </li>

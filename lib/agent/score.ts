@@ -38,6 +38,8 @@ export interface ScoreInput {
 export interface ScoreResult {
   /** Beta 后验均值；样本不足时固定 0.5 */
   p: number;
+  /** 成功把握所依据的历史样本数（T8 界面展示用） */
+  samples: number;
   /** 依赖源健康度乘积 */
   h: number;
   /** 期望净收益 = p·h·报酬 − 成本 − 风险惩罚 */
@@ -109,6 +111,7 @@ export function scoreOpportunity(input: ScoreInput): ScoreResult {
   const r4 = (n: number) => Math.round(n * 10_000) / 10_000;
   return {
     p: r4(p),
+    samples: Math.max(0, Math.floor(samples)),
     h: r4(h),
     ev: r4(ev),
     score: Number.isFinite(score) ? r4(score) : score,

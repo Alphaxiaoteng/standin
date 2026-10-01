@@ -248,6 +248,102 @@ export async function fetchEarningsToday(): Promise<EarningsToday | null> {
   };
 }
 
+/** 收入分账 + 链上确认交易回执（T8 首页三个数的数据源） */
+export interface EarningsReport {
+  todayNetUsdc: number;
+  todayCostUsdc: number;
+  demoUsdc: number;
+  onchainUsdcToday: number;
+  onchainUsdcTotal: number;
+  walletBalanceUsdc: number;
+  avoidedLossUsdc: number;
+  onchainTxs: Array<{ taskId: string; ts: number; revenueUsdc: number; txHash?: string; explorerUrl?: string }>;
+  onchainTxCount: number;
+}
+
+export async function fetchEarningsReport(): Promise<EarningsReport | null> {
+  const raw = await getJSON("/api/earnings/report");
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const today = (r.today ?? {}) as Record<string, unknown>;
+  const revenue = (r.revenue ?? {}) as Record<string, unknown>;
+  const protection = (r.protection ?? {}) as Record<string, unknown>;
+  const txs = Array.isArray(r.onchainTxs) ? r.onchainTxs : [];
+  return {
+    todayNetUsdc: num(today.netUsdc),
+    todayCostUsdc: num(today.totalCostUsdc),
+    demoUsdc: num(revenue.demoUsdc),
+    onchainUsdcToday: num(revenue.onchainUsdcToday),
+    onchainUsdcTotal: num(revenue.onchainUsdcTotal),
+    walletBalanceUsdc: num(r.walletBalanceUsdc),
+    avoidedLossUsdc: num(protection.totalAvoidedLossUsdc),
+    onchainTxCount: txs.length,
+    onchainTxs: txs.map((item) => {
+      const t = (item ?? {}) as Record<string, unknown>;
+      return {
+        taskId: str(t.taskId),
+        ts: num(t.ts),
+        revenueUsdc: num(t.revenueUsdc),
+        txHash: t.txHash === undefined ? undefined : str(t.txHash),
+        explorerUrl: t.explorerUrl === undefined ? undefined : str(t.explorerUrl),
+      };
+    }),
+  };
+}
+
+export interface LedgerTaskEntry {
+  id: string;
+  ts: number;
+  taskId: string;
+  taskType: string;
+  description: string;
+  costUsdc: number;
+  revenueUsdc: number;
+  netUsdc: number;
+  status: string;
+  reason?: string;
+  txHash?: string;
+  billing?: string;
+  buyerType?: string;
+  settlement?: string;
+  verifyChecks: Array<{ label: string; passed: boolean }>;
+  dataSources: Array<Record<string, unknown>>;
+  explorerUrl?: string;
+}
+
+/** 账本明细（任务粒度，T8） */
+export async function fetchLedgerEntries(): Promise<LedgerTaskEntry[] | null> {
+  const list = unwrap(await getJSON("/api/ledger"), "entries");
+  if (!list) return null;
+  return list.map((item, i) => {
+    const r = (item ?? {}) as Record<string, unknown>;
+    const meta = (r.meta ?? {}) as Record<string, unknown>;
+    const checks = Array.isArray(meta.verifyChecks) ? meta.verifyChecks : [];
+    return {
+      id: str(r.id, `led-${i}`),
+      ts: num(r.ts),
+      taskId: str(r.taskId),
+      taskType: str(r.taskType),
+      description: str(r.description),
+      costUsdc: num(r.costUsdc),
+      revenueUsdc: num(r.revenueUsdc),
+      netUsdc: num(r.netUsdc),
+      status: str(r.status),
+      reason: r.reason === undefined ? undefined : str(r.reason),
+      txHash: r.txHash === undefined ? undefined : str(r.txHash),
+      billing: meta.billing === undefined ? undefined : str(meta.billing),
+      buyerType: meta.buyerType === undefined ? undefined : str(meta.buyerType),
+      settlement: meta.settlement === undefined ? undefined : str(meta.settlement),
+      verifyChecks: checks.map((c) => {
+        const ck = (c ?? {}) as Record<string, unknown>;
+        return { label: str(ck.label), passed: Boolean(ck.passed) };
+      }),
+      dataSources: Array.isArray(meta.dataSources) ? (meta.dataSources as Array<Record<string, unknown>>) : [],
+      explorerUrl: meta.explorerUrl === undefined ? undefined : str(meta.explorerUrl),
+    };
+  });
+}
+
 export async function fetchOpportunities(): Promise<Opportunity[] | null> {
   const list = unwrap(await getJSON("/api/opportunities"), "opportunities");
   if (!list) return null;

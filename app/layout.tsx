@@ -20,6 +20,16 @@ export default function RootLayout({
           <div className="main-col">
             <Topbar />
             <main className="content">{children}</main>
+            <footer
+              style={{
+                padding: "14px 22px 18px",
+                borderTop: "1px solid var(--border)",
+                color: "var(--text-dim)",
+                fontSize: 12,
+              }}
+            >
+              Monad 测试网演示，不代表真实投资收益。
+            </footer>
           </div>
         </div>
       </body>

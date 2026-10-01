@@ -277,6 +277,29 @@ function baseTask(bounty: Bounty, status: SopTaskStatus, balance: number): SopTi
   };
 }
 
+/** 账本详情用：本单数据源与抓取时刻（来源可点开的证据链） */
+function dataSourceFacts(kind: BountyKind, ex: ExecuteResult): Array<Record<string, unknown>> {
+  if (kind === "data_brief" && ex.snapshot) {
+    const s = ex.snapshot;
+    const out: Array<Record<string, unknown>> = [];
+    const coins: Array<[string, BriefSnapshot["btc"]]> = [["BTC", s.btc], ["ETH", s.eth]];
+    for (const [coin, cq] of coins) {
+      if (cq?.coingecko) out.push({ source: `${coin} CoinGecko`, fetchedAt: cq.coingecko.fetchedAt });
+      if (cq?.coinbase) out.push({ source: `${coin} Coinbase`, fetchedAt: cq.coinbase.fetchedAt });
+      if (cq?.kraken) out.push({ source: `${coin} Kraken`, fetchedAt: cq.kraken.fetchedAt });
+    }
+    if (s.hnBoardFetchedAt) out.push({ source: "HN 独立回查榜单", fetchedAt: s.hnBoardFetchedAt });
+    return out;
+  }
+  const samples = ex.samples ?? [];
+  return [{
+    source: "两源 BTC 价差采样",
+    samples: samples.length,
+    firstAt: samples[0]?.at,
+    lastAt: samples[samples.length - 1]?.at,
+  }];
+}
+
 function terminalResult(input: {
   bounty: Bounty;
   status: SopTaskStatus;
@@ -483,6 +506,11 @@ export async function runSopTick(req: SopTickRequest, deps: SopDeps): Promise<So
   const isThirdParty = bounty.buyerType === "third_party";
   const revenue = verdict.passed && !isThirdParty ? bounty.rewardUsdc : 0;
   const net = revenue - bounty.costUsdc;
+  // 账本详情证据：验收规则命中 + 数据源抓取时刻（来源可点开）
+  const evidenceMeta = {
+    verifyChecks: checks,
+    dataSources: dataSourceFacts(bounty.kind, ex),
+  };
   const settlementEntry: SopSettlement = verdict.passed
     ? isThirdParty
       ? {
@@ -490,19 +518,20 @@ export async function runSopTick(req: SopTickRequest, deps: SopDeps): Promise<So
           description: `${bounty.title}：已交付，等待买方链上付款（settlement=pending）`,
           costUsdc: bounty.costUsdc, revenueUsdc: 0, status: "PENDING",
           reason: "验收通过，等待链上付款确认",
-          meta: { billing: "onchain", buyerType: bounty.buyerType, buyerAddress: bounty.buyerAddress, deliveredAt },
+          meta: { billing: "onchain", buyerType: bounty.buyerType, buyerAddress: bounty.buyerAddress, deliveredAt, ...evidenceMeta },
           ts: deliveredAt,
         }
       : {
           taskId: bounty.id, taskType: bounty.kind, description: bounty.title,
           costUsdc: bounty.costUsdc, revenueUsdc: revenue, status: "SUCCESS",
-          meta: { billing: "demo", buyerType: bounty.buyerType },
+          meta: { billing: "demo", buyerType: bounty.buyerType, ...evidenceMeta },
           ts: deliveredAt,
         }
     : {
         taskId: bounty.id, taskType: bounty.kind, description: bounty.title,
         costUsdc: bounty.costUsdc, revenueUsdc: 0, status: "FAILED",
         reason: verdict.reasons.join("；"),
+        meta: { buyerType: bounty.buyerType, ...evidenceMeta },
         ts: deliveredAt,
       };
   const err = recordLedger(deps, settlementEntry);

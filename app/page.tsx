@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * 今日账本（PRD §五）：
- * 顶部三个数：收入、成本、净利（真实账本数据，亏损单如实显示）。
- * 下方：本金曲线、状态行「Agent 正在做…」、机会快捷入口、时间轴流水。
+ * 今日账本（PRD §五 + T8 收口）：
+ * 第一屏三个数——今日净利（仅链上确认部分）、可动用本金、已避免损失；
+ * 演示收入单独一行小字，绝不与链上确认收入相加。
+ * 每个数字可点开看来源（数据源/抓取时刻/交易哈希）。
  */
 
 import { useEffect, useState } from "react";
@@ -12,48 +13,35 @@ import {
   fetchStats,
   fetchTransactions,
   fetchIntercepts,
-  fetchProtection,
-  fetchEarningsToday,
+  fetchEarningsReport,
   fetchOpportunities,
-  runAgent,
   runSopTask,
+  type EarningsReport,
 } from "./components/api";
-import type {
-  EarningsToday,
-  Intercept,
-  Opportunity,
-  Protection,
-  Stats,
-  Transaction,
-} from "./components/types";
+import type { Intercept, Opportunity, Stats, Transaction } from "./components/types";
 import { buildTimeline, Timeline } from "./components/Timeline";
 import PageHead from "./components/PageHead";
 import { formatAmount } from "./components/format";
-import { IconShield, IconAlert, IconWallet, IconActivity } from "./components/icons";
+import { IconShield, IconWallet, IconActivity } from "./components/icons";
 
-const SCENARIOS = [
-  { key: "allowed", label: "正常采购", desc: "它按规矩向供应商付款", tone: "ok" },
-  { key: "phishing", label: "遇到骗子", desc: "被诱导把钱转给陌生地址", tone: "bad" },
-  { key: "infinite", label: "授权陷阱", desc: "被要求交出全部钱包权限", tone: "bad" },
-] as const;
+const USDC_MONAD = "0x534b2f3A21130d7a60830c2Df862319e593943A3";
 
 export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [txs, setTxs] = useState<Transaction[] | null>(null);
   const [intercepts, setIntercepts] = useState<Intercept[] | null>(null);
-  const [protection, setProtection] = useState<Protection | null>(null);
-  const [earnings, setEarnings] = useState<EarningsToday | null>(null);
+  const [report, setReport] = useState<EarningsReport | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [activeTaskLabel, setActiveTaskLabel] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [openSource, setOpenSource] = useState<"net" | "balance" | "avoided" | "demo" | null>(null);
 
   const reload = () => {
     void fetchStats().then(setStats);
     void fetchTransactions().then(setTxs);
     void fetchIntercepts().then(setIntercepts);
-    void fetchProtection().then(setProtection);
-    void fetchEarningsToday().then(setEarnings);
+    void fetchEarningsReport().then(setReport);
     void fetchOpportunities().then(setOpportunities);
   };
 
@@ -69,7 +57,7 @@ export default function Home() {
         ? "这次没做成，后端未响应"
         : out.ok
           ? out.task.netUsdc >= 0
-            ? `验收通过，净赚 ${out.task.netUsdc.toFixed(2)} USDC。`
+            ? "任务交付通过。链上确认收入以结算回执为准。"
             : `已结算，净亏 ${Math.abs(out.task.netUsdc).toFixed(2)} USDC（成本已沉没）。`
           : out.task.failReason
             ? `未通过：${out.task.failReason}`
@@ -80,106 +68,147 @@ export default function Home() {
     setBusy(false);
   };
 
-  const run = async (key: string) => {
-    setBusy(true);
-    setActiveTaskLabel(`执行「${key}」场景测试`);
-    setFlash(null);
-    const out = await runAgent(key as "allowed" | "phishing" | "infinite");
-    if (out?.result?.status === "INTERCEPTED") {
-      setFlash("发现异常，已拦截，钱没丢。");
-    } else if (out?.result?.status === "EXECUTED") {
-      setFlash("付款成功，已记入流水。");
-    }
-    reload();
-    setActiveTaskLabel(null);
-    setBusy(false);
-  };
-
   const events = buildTimeline(txs, intercepts);
-  const revenue = earnings?.totalRevenueUsdc ?? 0;
-  const cost = earnings?.totalCostUsdc ?? 0;
-  const net = earnings?.netUsdc ?? 0;
+  const onchainNet = report?.onchainUsdcToday ?? 0;
   const balance = stats?.walletBalance ?? 0;
-  const spent = stats?.todaySpent ?? 0;
-  const avoidedLoss = protection?.totalAvoidedLossUsdc ?? 0;
+  const avoidedLoss = report?.avoidedLossUsdc ?? 0;
+  const demoRevenue = report?.demoUsdc ?? 0;
+  const todayCost = report?.todayCostUsdc ?? 0;
+
+  const toggle = (k: "net" | "balance" | "avoided" | "demo") =>
+    setOpenSource((cur) => (cur === k ? null : k));
 
   return (
     <div className="page">
       <PageHead
         title="今日账本"
-        desc="AI 员工今天赚了多少、花了多少。数据全部来自落盘账本，亏损单如实显示。"
+        desc="AI 员工今天赚了多少、花了多少。链上确认收入与演示收入分开记账，亏损单如实显示。"
       />
 
-      {/* 显著 CTA：门禁红绿灯演示 */}
-      <Link
-        href="/guardrail"
-        className="btn btn-primary"
-        style={{ alignSelf: "flex-start", marginBottom: 4 }}
-      >
-        <IconShield size={14} /> 打开门禁红绿灯演示
-      </Link>
-
-      {/* 顶部三个核心指标（PRD §五：收入、成本、净利） */}
+      {/* 第一屏三个数（T8）：净利只算链上确认部分 */}
       <div className="summary">
-        <div className="summary-item">
-          <span className="summary-label">今日收入</span>
-          <span className="summary-value" style={{ color: "var(--green)" }}>
-            {formatAmount(revenue)}
-            <em>USDC</em>
-          </span>
-        </div>
-        <div className="summary-item">
-          <span className="summary-label">今日成本</span>
-          <span className="summary-value">
-            {formatAmount(cost)}
-            <em>USDC</em>
-          </span>
-        </div>
-        <div
-          className={`summary-item ${net < 0 ? "summary-item-bad" : ""}`}
+        <button
+          type="button"
+          className="summary-item"
+          onClick={() => toggle("net")}
+          style={{ textAlign: "left", cursor: "pointer" }}
         >
-          <span className="summary-label">今日净利</span>
+          <span className="summary-label">今日净利（链上确认）</span>
           <span
             className="summary-value"
-            style={{
-              color: net > 0 ? "var(--green)" : net < 0 ? "var(--red)" : "var(--text)",
-            }}
+            style={{ color: onchainNet > 0 ? "var(--green)" : onchainNet < 0 ? "var(--red)" : "var(--text)" }}
           >
-            {net > 0 ? "+" : ""}
-            {formatAmount(net)}
+            {onchainNet > 0 ? "+" : ""}
+            {formatAmount(onchainNet)}
             <em>USDC</em>
           </span>
-        </div>
-      </div>
-
-      {/* 资产与本金保护次级行 */}
-      <div className="summary">
-        <div className="summary-item">
+        </button>
+        <button
+          type="button"
+          className="summary-item"
+          onClick={() => toggle("balance")}
+          style={{ textAlign: "left", cursor: "pointer" }}
+        >
           <span className="summary-label">
-            <IconWallet size={12} /> 本金余额
+            <IconWallet size={12} /> 可动用本金
           </span>
           <span className="summary-value">
             {formatAmount(balance)}
             <em>USDC</em>
           </span>
-        </div>
-        <div className="summary-item">
+        </button>
+        <button
+          type="button"
+          className="summary-item"
+          onClick={() => toggle("avoided")}
+          style={{ textAlign: "left", cursor: "pointer" }}
+        >
           <span className="summary-label">
-            <IconShield size={12} /> 门禁避免损失
+            <IconShield size={12} /> 已避免损失
           </span>
           <span className="summary-value" style={{ color: "var(--green)" }}>
             {formatAmount(avoidedLoss)}
             <em>USDC</em>
           </span>
-        </div>
-        <div className="summary-item">
-          <span className="summary-label">今日支出流水</span>
-          <span className="summary-value">
-            {formatAmount(spent)}
-            <em>USDC</em>
-          </span>
-        </div>
+        </button>
       </div>
+
+      {/* 演示收入：单独一行小字，不与链上确认收入相加 */}
+      <button
+        type="button"
+        onClick={() => toggle("demo")}
+        style={{
+          alignSelf: "flex-start",
+          background: "none",
+          border: "none",
+          padding: 0,
+          color: "var(--text-dim)",
+          fontSize: 12,
+          cursor: "pointer",
+          textDecoration: "underline dotted",
+        }}
+      >
+        演示收入（DEMO BUYER，本地结算）{formatAmount(demoRevenue)} USDC · 今日成本 {formatAmount(todayCost)} USDC
+      </button>
+
+      {/* 来源面板：任一数字点开看到来源 */}
+      {openSource === "net" && (
+        <div className="notice">
+          <div className="card-title">来源：链上 USDC Transfer 回执</div>
+          {report && report.onchainTxs.length > 0 ? (
+            <div className="stack" style={{ gap: 4, marginTop: 6 }}>
+              {report.onchainTxs.map((t, i) => (
+                <span key={i} className="mono" style={{ fontSize: 12 }}>
+                  {t.taskId} · {formatAmount(t.revenueUsdc)} USDC ·{" "}
+                  {t.explorerUrl ? (
+                    <a href={t.explorerUrl} target="_blank" rel="noreferrer">
+                      {t.txHash?.slice(0, 18)}…
+                    </a>
+                  ) : (
+                    t.txHash?.slice(0, 18)
+                  )}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: 12.5, marginTop: 6 }}>
+              暂无链上确认收入（确认代币 {USDC_MONAD.slice(0, 10)}…）。没有买方付款回执就不计入净利。
+            </div>
+          )}
+          <div style={{ fontSize: 12, marginTop: 6 }}>
+            全部账本明细见 <Link href="/transactions">账本页</Link>
+          </div>
+        </div>
+      )}
+      {openSource === "balance" && (
+        <div className="notice">
+          <div className="card-title">来源：本地账本余额</div>
+          <div style={{ fontSize: 12.5, marginTop: 6 }}>
+            ledger.json stats.walletBalance（Monad 测试网 · 演示规模）。每笔成本扣减与
+            {report && report.onchainTxs.length > 0 ? " 链上确认收入入账" : " 演示结算"}都会更新，
+            流水见 <Link href="/transactions">账本页</Link>。
+          </div>
+        </div>
+      )}
+      {openSource === "avoided" && (
+        <div className="notice">
+          <div className="card-title">来源：拦截记录</div>
+          <div style={{ fontSize: 12.5, marginTop: 6 }}>
+            累计拦截 {stats?.interceptCount ?? 0} 次，按被拦截意图的声明金额推导避免损失。
+            逐条证据（声明 vs 实际 calldata）见 <Link href="/guardrail">门禁页</Link> 与{" "}
+            <Link href="/intercepts">拦截记录</Link>。
+          </div>
+        </div>
+      )}
+      {openSource === "demo" && (
+        <div className="notice">
+          <div className="card-title">来源：演示买方本地结算</div>
+          <div style={{ fontSize: 12.5, marginTop: 6 }}>
+            DEMO BUYER 不发生真实链上转账，验收通过即本地结算记账（meta.billing=demo）。
+            演示收入与链上确认收入分开统计，本页从不把两者相加。
+          </div>
+        </div>
+      )}
 
       {/* 状态行（PRD §五：一行「Agent 正在做…」） */}
       <div
@@ -203,7 +232,7 @@ export default function Home() {
         />
         <span className="is-strong">
           {busy
-            ? `Agent 正在做：${activeTaskLabel}…（双源实时采集中）`
+            ? `Agent 正在做：${activeTaskLabel}…（多源实时采集中）`
             : "Agent 处于待命状态：健康度正常，等待新任务触发"}
         </span>
         <span className="spacer" />
@@ -231,7 +260,7 @@ export default function Home() {
             </Link>
           </div>
           <span className="demo-hint">
-            真实数据验收：价差超 50bps 或超时将判定未通过记亏。
+            真实数据验收：三源中位数偏差超 50bps 或超时将判定未通过记亏。
           </span>
         </div>
         <div className="demo-grid">
@@ -259,30 +288,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* 门禁剧本测试 */}
-      <div className="demo">
-        <div className="demo-head">
-          <span className="demo-title">安全门禁演练</span>
-          <span className="demo-hint">
-            测试门禁对异常意图的防御：篡改收款方或无限授权都会被拦截
-          </span>
-        </div>
-        <div className="demo-grid">
-          {SCENARIOS.map((s) => (
-            <button
-              key={s.key}
-              type="button"
-              className={`demo-card demo-${s.tone}`}
-              onClick={() => void run(s.key)}
-              disabled={busy}
-            >
-              <span className="demo-card-label">{s.label}</span>
-              <span className="demo-card-desc">{s.desc}</span>
-            </button>
-          ))}
-        </div>
-        {flash && <div className="demo-flash">{flash}</div>}
-      </div>
+      {flash && <div className="demo-flash">{flash}</div>}
 
       {/* 时间轴：它做了什么 */}
       <div className="section">
@@ -293,7 +299,7 @@ export default function Home() {
         {txs === null && intercepts === null ? (
           <div className="tl-empty">正在读取…</div>
         ) : (
-          <Timeline events={events} />
+          <Timeline events={events} showHashes={false} />
         )}
       </div>
 

@@ -178,6 +178,8 @@ export interface OpportunityDecision {
   score: number;
   p: number;
   h: number;
+  samples?: number;
+  sourceHealth?: Array<{ name: string; score: number; healthy: boolean }>;
   sampleInsufficient: boolean;
   risk: "low" | "medium";
   windowSec: number;

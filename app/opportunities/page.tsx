@@ -189,7 +189,7 @@ export default function OpportunitiesPage() {
         </Card>
       )}
 
-      {/* 选中的候选卡��� */}
+      {/* 选中的候选卡片（T8：固定四行：预计净利 / 成功把握及样本数 / 数据源健康数 / Agent 决定） */}
       <Card
         title="入选机会（按期望收益排序）"
         desc="由算法选出：EV > 0、源健康度 ≥ 0.6、在今日预算与单笔上限内"
@@ -202,71 +202,70 @@ export default function OpportunitiesPage() {
         >
           {(list) => (
             <div className="stack" style={{ gap: 12, padding: 16 }}>
-              {list.map((o) => (
-                <div
-                  key={o.id}
-                  className="demo-card demo-ok"
-                  style={{ textAlign: "left", cursor: "default" }}
-                >
-                  <div className="row" style={{ alignItems: "center", gap: 8 }}>
-                    <span className="demo-card-label">{o.title}</span>
-                    <Badge tone={o.buyerType === "demo" ? "neutral" : "accent"}>
-                      {o.buyer}
-                    </Badge>
-                    {o.sampleInsufficient && (
-                      <Badge tone="warn">样本不足（p 取 0.5）</Badge>
-                    )}
-                    <span className="spacer" />
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      onClick={() => void execute(o)}
-                      disabled={busy !== null || !!guard?.halt}
-                    >
-                      <IconPlay size={12} />
-                      {busy === o.id ? "执行中…" : "让它做"}
-                    </button>
-                  </div>
-
-                  <div className="demo-card-desc">{o.description}</div>
-
+              {list.map((o) => {
+                const healthyCount = (o.sourceHealth ?? []).filter((x) => x.healthy).length;
+                const totalSources = (o.sourceHealth ?? []).length;
+                return (
                   <div
-                    className="row"
-                    style={{
-                      gap: 16,
-                      fontSize: 12,
-                      marginTop: 6,
-                      paddingTop: 8,
-                      borderTop: "1px dashed var(--border)",
-                    }}
+                    key={o.id}
+                    className="demo-card demo-ok"
+                    style={{ textAlign: "left", cursor: "default" }}
                   >
-                    <span>
-                      报酬：<strong>{formatAmount(o.rewardUsdc)}</strong> USDC
-                    </span>
-                    <span>
-                      成本：<strong>{formatAmount(o.costUsdc)}</strong> USDC
-                    </span>
-                    <span style={{ color: "var(--green)" }}>
-                      期望收益 EV：<strong>{formatAmount(o.ev)}</strong> USDC
-                    </span>
-                    <span>
-                      排序分 EV/成本：<strong>{o.score.toFixed(2)}</strong>
-                    </span>
-                    <span className="muted">
-                      成功率 p={o.p} · 健康度 h={o.h}
-                    </span>
+                    <div className="row" style={{ alignItems: "center", gap: 8 }}>
+                      <span className="demo-card-label">{o.title}</span>
+                      <Badge tone={o.buyerType === "demo" ? "neutral" : "accent"}>
+                        {o.buyerType === "demo" ? "DEMO BUYER" : "COMMUNITY BUYER"}
+                      </Badge>
+                      <span className="spacer" />
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => void execute(o)}
+                        disabled={busy !== null || !!guard?.halt}
+                      >
+                        <IconPlay size={12} />
+                        {busy === o.id ? "执行中…" : "让它做"}
+                      </button>
+                    </div>
+
+                    <div
+                      className="stack"
+                      style={{
+                        gap: 5,
+                        fontSize: 12.5,
+                        marginTop: 8,
+                        paddingTop: 8,
+                        borderTop: "1px dashed var(--border)",
+                      }}
+                    >
+                      <span>
+                        预计净利：<strong style={{ color: o.ev > 0 ? "var(--green)" : "var(--text)" }}>{formatAmount(o.ev)}</strong> USDC（报酬 {formatAmount(o.rewardUsdc)} − 成本 {formatAmount(o.costUsdc)}）
+                      </span>
+                      <span>
+                        成功把握：p={o.p}
+                        {o.sampleInsufficient ? "（样本不足，按 0.5 保守取值）" : `（依据 ${o.samples ?? 0} 个历史样本）`}
+                      </span>
+                      <span>
+                        数据源健康：{healthyCount}/{totalSources}
+                        {(o.sourceHealth ?? []).some((x) => !x.healthy) && "（不健康的源已降级处理）"}
+                      </span>
+                      <span>
+                        Agent 决定：<strong style={{ color: "var(--green)" }}>执行</strong>
+                        （排序分 EV/成本 {Number.isFinite(o.score) ? o.score.toFixed(2) : "∞"}）
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </DataState>
       </Card>
 
-      {/* 放弃理由（PRD §三：记录剔除原因作为「放弃理由」展���） */}
+      {/* 放弃的机会（T8：卡片置灰、无按钮、理由由 score/select 规则模板给出） */}
       <Card
-        title="放弃理由（未入选的候选）"
-        desc="严格按规则剔除，不因「可能赚」而冒险执行"
+        title="放弃的机会"
+        desc="严格按规则剔除，不因「可能赚」而冒险执行；放弃是决定，不是失败"
         flush
       >
         <DataState
@@ -279,22 +278,23 @@ export default function OpportunitiesPage() {
               {skipped.map((s) => (
                 <div
                   key={s.id}
-                  className="row"
+                  className="demo-card"
                   style={{
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "8px 12px",
-                    background: "#0e1017",
-                    border: "1px solid var(--border)",
-                    borderRadius: "var(--radius-sm)",
+                    textAlign: "left",
+                    cursor: "default",
+                    opacity: 0.55,
+                    filter: "grayscale(1)",
+                    pointerEvents: "none",
                   }}
                 >
-                  <Badge tone="neutral">{s.id}</Badge>
-                  {s.title && <span className="is-strong">{s.title}</span>}
-                  <span className="spacer" />
-                  <span style={{ color: "var(--red)", fontSize: 12.5 }}>
+                  <div className="row" style={{ alignItems: "center", gap: 8 }}>
+                    <span className="demo-card-label">{s.title || s.id}</span>
+                    <span className="spacer" />
+                    <Badge tone="neutral">Agent 决定：放弃</Badge>
+                  </div>
+                  <div className="demo-card-desc" style={{ color: "var(--red)" }}>
                     放弃理由：{s.reason}
-                  </span>
+                  </div>
                 </div>
               ))}
             </div>
