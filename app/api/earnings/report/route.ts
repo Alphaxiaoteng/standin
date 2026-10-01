@@ -10,7 +10,8 @@
 
 import { NextResponse } from "next/server";
 import { getLedgerSummary, getRevenueSplit, listLedgerEntries } from "@/lib/ledger";
-import { getStats } from "@/lib/store";
+import { getStats, listIntercepts, listRehearsals } from "@/lib/store";
+import { deriveAvoidedLoss } from "@/lib/agent/avoidedLoss";
 import { listBounties } from "@/lib/market/bounties";
 import { pollPendingSettlements, agentAddress } from "@/lib/chain/settlementWatcher";
 
@@ -86,8 +87,12 @@ export async function GET() {
     settlementPoll,
     walletBalanceUsdc: stats.walletBalance,
     protection: {
-      // 本金保护：拦截避免损失从拦截记录推导（见 /api/intercepts）
-      totalAvoidedLossUsdc: summary.avoidLossUsdc ?? 0,
+      // 本金保护：与 /api/intercepts 同一推导（deriveAvoidedLoss over 拦截记录），
+      // 不读账本 seed 字段——两个页面必须显示同一个数字（单一事实来源）
+      totalAvoidedLossUsdc: listIntercepts().reduce((sum, it) => {
+        const v = deriveAvoidedLoss(it, listRehearsals());
+        return v !== null ? Number((sum + v).toFixed(6)) : sum;
+      }, 0),
     },
   });
 }
