@@ -31,9 +31,10 @@ export interface SopSettlement {
   description: string;
   costUsdc: number;
   revenueUsdc: number;
-  status: "SUCCESS" | "FAILED" | "INTERCEPTED" | "SKIPPED";
+  status: "SUCCESS" | "FAILED" | "INTERCEPTED" | "SKIPPED" | "PENDING";
   reason?: string;
   avoidLossUsdc?: number;
+  meta?: Record<string, unknown>;
   ts?: number;
 }
 
@@ -478,16 +479,33 @@ export async function runSopTick(req: SopTickRequest, deps: SopDeps): Promise<So
   }
   steps.push(verdict.passed ? step("验收", "ok", "规则逐条通过") : step("验收", "fail", verdict.reasons.join("；") || "未通过"));
 
-  /* 7. 结算 */
-  const revenue = verdict.passed ? bounty.rewardUsdc : 0;
+  /* 7. 结算（漏洞 C：第三方单验收通过 ≠ 收到钱，只置 pending 等链上回执） */
+  const isThirdParty = bounty.buyerType === "third_party";
+  const revenue = verdict.passed && !isThirdParty ? bounty.rewardUsdc : 0;
   const net = revenue - bounty.costUsdc;
-  const err = recordLedger(deps, {
-    taskId: bounty.id, taskType: bounty.kind, description: bounty.title,
-    costUsdc: bounty.costUsdc, revenueUsdc: revenue,
-    status: verdict.passed ? "SUCCESS" : "FAILED",
-    reason: verdict.passed ? undefined : verdict.reasons.join("；"),
-    ts: deliveredAt,
-  });
+  const settlementEntry: SopSettlement = verdict.passed
+    ? isThirdParty
+      ? {
+          taskId: bounty.id, taskType: bounty.kind,
+          description: `${bounty.title}：已交付，等待买方链上付款（settlement=pending）`,
+          costUsdc: bounty.costUsdc, revenueUsdc: 0, status: "PENDING",
+          reason: "验收通过，等待链上付款确认",
+          meta: { billing: "onchain", buyerType: bounty.buyerType, buyerAddress: bounty.buyerAddress, deliveredAt },
+          ts: deliveredAt,
+        }
+      : {
+          taskId: bounty.id, taskType: bounty.kind, description: bounty.title,
+          costUsdc: bounty.costUsdc, revenueUsdc: revenue, status: "SUCCESS",
+          meta: { billing: "demo", buyerType: bounty.buyerType },
+          ts: deliveredAt,
+        }
+    : {
+        taskId: bounty.id, taskType: bounty.kind, description: bounty.title,
+        costUsdc: bounty.costUsdc, revenueUsdc: 0, status: "FAILED",
+        reason: verdict.reasons.join("；"),
+        ts: deliveredAt,
+      };
+  const err = recordLedger(deps, settlementEntry);
   if (err) {
     deps.wallet.credit(bounty.costUsdc);
     steps.push(step("结算", "fail", `账本写失败：${err}，已回滚扣款并停机，禁止继续花钱`));
@@ -504,11 +522,18 @@ export async function runSopTick(req: SopTickRequest, deps: SopDeps): Promise<So
       steps,
     };
   }
-  if (verdict.passed) deps.wallet.credit(revenue);
+  if (verdict.passed && revenue > 0) deps.wallet.credit(revenue);
   Object.assign(deps.guard, settleTrade(deps.guard, {
-    kind: bounty.kind, status: verdict.passed ? "passed" : "failed", costUsdc: bounty.costUsdc, revenueUsdc: revenue, at: deliveredAt,
+    kind: bounty.kind,
+    // 第三方单交付成功但收入未到账：按 revenue 0 结算，收款由 watcher 确认后补记
+    status: verdict.passed ? "passed" : "failed", costUsdc: bounty.costUsdc, revenueUsdc: revenue, at: deliveredAt,
   }));
-  steps.push(step("结算", "ok", verdict.passed ? `收入 ${r2(revenue)}，净利 ${r2(net)}` : `成本沉没，净亏 ${r2(-net)}`));
+  steps.push(step("结算", "ok",
+    verdict.passed
+      ? isThirdParty
+        ? `已交付；收入待链上付款确认（settlement=pending），成本 ${r2(bounty.costUsdc)} 已记`
+        : `收入 ${r2(revenue)}，净利 ${r2(net)}`
+      : `成本沉没，净亏 ${r2(-net)}`));
 
   /* 8. 复盘 */
   deps.posterior.observe(bounty.kind, verdict.passed);

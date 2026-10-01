@@ -363,6 +363,62 @@ describe("runSopTick spread_watch 通知回放（验收只认独立通知存储�
   });
 });
 
+describe("runSopTick 结算证据（漏洞 C：收入必须有链上证据）", () => {
+  it("third-party pass books PENDING with zero revenue and no wallet credit", async () => {
+    const thirdParty = sampleBounty({
+      id: "bnty-3p",
+      buyerType: "third_party",
+      buyer: "COMMUNITY BUYER",
+      buyerAddress: "0x1111111111111111111111111111111111111111",
+    });
+    const rig = createRig({ bounties: [thirdParty] });
+    const res = await runSopTick(rig.req, rig.deps);
+
+    // 交付通过
+    expect(res.task.status).toBe("passed");
+    // 但收入为 0：等链上付款确认
+    expect(res.task.revenueUsdc).toBe(0);
+    expect(res.task.netUsdc).toBe(-0.4);
+    // 钱包没有 credit：20 - 0.4，不加报酬
+    expect(res.task.walletBalanceUsdc).toBe(19.6);
+
+    const entry = rig.ledgerEntries[0];
+    expect(entry.status).toBe("PENDING");
+    expect(entry.costUsdc).toBe(0.4);
+    expect(entry.revenueUsdc).toBe(0);
+    expect(entry.meta).toMatchObject({ billing: "onchain", buyerAddress: "0x1111111111111111111111111111111111111111" });
+
+    // guard 今日收入不包含未确认的报酬
+    expect(rig.deps.guard.revenueTodayUsdc).toBe(0);
+    expect(rig.deps.guard.costTodayUsdc).toBe(0.4);
+  });
+
+  it("demo pass books demo-billed revenue immediately", async () => {
+    const rig = createRig();
+    const res = await runSopTick(rig.req, rig.deps);
+
+    expect(res.task.revenueUsdc).toBe(2);
+    expect(res.task.walletBalanceUsdc).toBe(21.6);
+    expect(rig.ledgerEntries[0]).toMatchObject({ status: "SUCCESS", revenueUsdc: 2 });
+    expect(rig.ledgerEntries[0].meta).toMatchObject({ billing: "demo" });
+  });
+
+  it("third-party verification failure still books a plain loss", async () => {
+    const thirdParty = sampleBounty({
+      id: "bnty-3p-fail",
+      buyerType: "third_party",
+      buyerAddress: "0x1111111111111111111111111111111111111111",
+    });
+    const rig = createRig({
+      bounties: [thirdParty],
+      executorResult: { ok: true, snapshot: sampleBrief(65_000) }, // 过期报价
+    });
+    const res = await runSopTick(rig.req, rig.deps);
+    expect(res.task.status).toBe("failed");
+    expect(rig.ledgerEntries[0]).toMatchObject({ status: "FAILED", costUsdc: 0.4, revenueUsdc: 0 });
+  });
+});
+
 describe("runSopTick ledger crash rollback (PRD §四 结算回滚并停机)", () => {
   it("rolls back wallet debit when ledger write fails, prohibiting further spend", async () => {
     const rig = createRig({ throwOnLedgerSettle: true });

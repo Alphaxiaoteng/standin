@@ -9,6 +9,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { isAddress } from "viem";
 import { addBounty, ensureSeedBounties } from "@/lib/market/bounties";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,8 @@ interface BountyInput {
   toleranceBps?: unknown;
   buyerType?: unknown;
   buyerName?: unknown;
+  /** 第三方买方钱包地址（付款来源，验收后据此核对链上 USDC 转账） */
+  buyerAddress?: unknown;
 }
 
 function bad(message: string) {
@@ -65,6 +68,14 @@ export async function POST(request: Request) {
   }
 
   const buyerType = body.buyerType === "demo" ? "demo" : "third_party";
+  // T5：第三方买方必须提供钱包地址，否则链上付款无从核对；DEMO BUYER 不要求
+  let buyerAddress: string | undefined;
+  if (buyerType === "third_party") {
+    if (typeof body.buyerAddress !== "string" || !isAddress(body.buyerAddress)) {
+      return bad("第三方买方必须提供有效的 buyerAddress（0x 钱包地址），链上付款将据此核对");
+    }
+    buyerAddress = body.buyerAddress as `0x${string}`;
+  }
   const buyerName =
     typeof body.buyerName === "string" && body.buyerName.trim()
       ? body.buyerName.trim().slice(0, 40)
@@ -77,6 +88,7 @@ export async function POST(request: Request) {
     toleranceBps,
     buyerType,
     buyerName,
+    buyerAddress,
   });
 
   return NextResponse.json({ ok: true, bounty });

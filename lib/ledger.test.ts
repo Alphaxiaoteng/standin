@@ -10,6 +10,8 @@ import {
   addCost,
   addRevenue,
   getLedgerSummary,
+  getRevenueSplit,
+  creditBalance,
   listLedgerEntries,
   withRollback,
   isHalted,
@@ -260,5 +262,28 @@ describe("Ledger - 默认单例与 API 接口契约", () => {
     expect(getKv("agent_status")).toBe("ACTIVE");
     expect(getKv("today_quota")).toEqual({ max: 10, current: 2 });
     expect(getKv("non_existent")).toBeUndefined();
+  });
+});
+
+describe("T5 creditBalance 与收入分账", () => {
+  it("creditBalance 只加余额不落账", () => {
+    const before = getStats();
+    creditBalance(1.25);
+    const after = getStats();
+    expect(after.walletBalance).toBeCloseTo(before.walletBalance + 1.25, 6);
+  });
+
+  it("getRevenueSplit 按 meta.billing 分账且不相加", () => {
+    settle({
+      taskId: "t-demo", description: "demo 单", costUsdc: 0, revenueUsdc: 2,
+      status: "SUCCESS", meta: { billing: "demo" },
+    });
+    settle({
+      taskId: "t-onchain", description: "链上确认", costUsdc: 0, revenueUsdc: 3,
+      status: "SUCCESS", meta: { billing: "onchain" },
+    });
+    const split = getRevenueSplit();
+    expect(split.demoUsdc).toBeGreaterThanOrEqual(2);
+    expect(split.onchainUsdc).toBeGreaterThanOrEqual(3);
   });
 });

@@ -8,6 +8,9 @@ import { dirname, resolve } from "node:path";
 
 export type BountyKind = "data_brief" | "spread_watch";
 
+/** 结算状态：pending=等待买方链上付款；confirmed=已确认（demo 为演示结算，第三方须有链上回执）；unpaid=过期未付 */
+export type SettlementStatus = "pending" | "confirmed" | "unpaid";
+
 export interface Bounty {
   id: string;
   kind: BountyKind;
@@ -24,6 +27,12 @@ export interface Bounty {
   status: "open" | "claimed" | "done" | "failed" | "cancelled";
   buyer: string;
   buyerType: "demo" | "third_party";
+  /** 第三方买方收款退回地址 / 付款来源地址（第三方发布必填，demo 无） */
+  buyerAddress?: string;
+  /** 链上付款回执：watcher 匹配到的 USDC Transfer */
+  payoutTxHash?: string;
+  payoutBlockNumber?: number;
+  settlement: SettlementStatus;
   createdAt: number;
   expiresAt: number;
 }
@@ -38,6 +47,8 @@ export interface NewBountyInput {
   toleranceBps?: number;
   buyerType?: "demo" | "third_party";
   buyerName?: string;
+  /** 第三方买方钱包地址（buyerType=third_party 时必填，由 API 层校验格式） */
+  buyerAddress?: string;
   /** 测试注入：覆盖当前时刻 */
   now?: number;
   /** 测试注入：自定义 id */
@@ -87,6 +98,14 @@ function reviveBounty(raw: unknown): Bounty | null {
   const status = r.status;
   const num = (v: unknown, fallback: number | null): number | null =>
     typeof v === "number" && Number.isFinite(v) ? v : fallback;
+  const buyerType = r.buyerType === "third_party" ? "third_party" : "demo";
+  // 旧文件无 settlement：按买方类型给缺省（demo=演示结算即确认，第三方=待付款）
+  const settlement: SettlementStatus =
+    r.settlement === "confirmed" || r.settlement === "unpaid" || r.settlement === "pending"
+      ? r.settlement
+      : buyerType === "demo"
+        ? "confirmed"
+        : "pending";
   return {
     id: typeof r.id === "string" ? r.id : `bnty-malformed-${Math.random().toString(36).slice(2, 8)}`,
     kind: r.kind,
@@ -98,7 +117,14 @@ function reviveBounty(raw: unknown): Bounty | null {
     toleranceBps: num(r.toleranceBps, DEFAULT_TOLERANCE_BPS[r.kind]),
     status: status === "claimed" || status === "done" || status === "failed" || status === "cancelled" ? status : "open",
     buyer: typeof r.buyer === "string" ? r.buyer : DEMO_BUYERS[0],
-    buyerType: r.buyerType === "third_party" ? "third_party" : "demo",
+    buyerType,
+    buyerAddress: typeof r.buyerAddress === "string" ? r.buyerAddress : undefined,
+    payoutTxHash: typeof r.payoutTxHash === "string" ? r.payoutTxHash : undefined,
+    payoutBlockNumber:
+      typeof r.payoutBlockNumber === "number" && Number.isFinite(r.payoutBlockNumber)
+        ? r.payoutBlockNumber
+        : undefined,
+    settlement,
     createdAt: num(r.createdAt, 0) as number,
     expiresAt: num(r.expiresAt, 0) as number,
   };
@@ -120,6 +146,7 @@ function seedBountyStore(now: number): BountyStoreFile {
         status: "open",
         buyer: DEMO_BUYERS[0],
         buyerType: "demo",
+        settlement: "pending",
         createdAt: now,
         expiresAt: now + 3600 * 24 * 1000,
       },
@@ -135,6 +162,7 @@ function seedBountyStore(now: number): BountyStoreFile {
         status: "open",
         buyer: DEMO_BUYERS[1],
         buyerType: "demo",
+        settlement: "pending",
         createdAt: now,
         expiresAt: now + 3600 * 24 * 1000,
       },
@@ -150,6 +178,7 @@ function seedBountyStore(now: number): BountyStoreFile {
         status: "open",
         buyer: DEMO_BUYERS[0],
         buyerType: "demo",
+        settlement: "pending",
         createdAt: now,
         expiresAt: now + 3600 * 24 * 1000,
       },
@@ -222,6 +251,8 @@ export function addBounty(input: NewBountyInput, overrides: { path?: string } = 
     status: "open",
     buyer,
     buyerType,
+    buyerAddress: buyerType === "third_party" ? input.buyerAddress : undefined,
+    settlement: "pending",
     createdAt: now,
     expiresAt: now + (input.windowSec ?? DEFAULT_WINDOW_SEC[kind]) * 1_000,
   };
@@ -250,6 +281,29 @@ export function updateBountyStatus(id: string, status: Bounty["status"], overrid
   const found = store.bounties.find((b) => b.id === id);
   if (!found) return null;
   found.status = status;
+  persist(path, store);
+  return { ...found };
+}
+
+/** 结算回写：watcher 确认或过期时调用 */
+export function updateBountySettlement(
+  id: string,
+  patch: {
+    settlement: SettlementStatus;
+    payoutTxHash?: string;
+    payoutBlockNumber?: number;
+    status?: Bounty["status"];
+  },
+  overrides: { path?: string } = {},
+): Bounty | null {
+  const path = overrides.path ?? process.env.STANDIN_BOUNTIES_PATH ?? defaultStorePath();
+  const store = loadStore(path);
+  const found = store.bounties.find((b) => b.id === id);
+  if (!found) return null;
+  found.settlement = patch.settlement;
+  if (patch.payoutTxHash !== undefined) found.payoutTxHash = patch.payoutTxHash;
+  if (patch.payoutBlockNumber !== undefined) found.payoutBlockNumber = patch.payoutBlockNumber;
+  if (patch.status !== undefined) found.status = patch.status;
   persist(path, store);
   return { ...found };
 }

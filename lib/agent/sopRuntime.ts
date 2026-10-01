@@ -38,7 +38,8 @@ import {
   fetchHnTop,
 } from "../market/sources";
 import { getStats, recordSpend } from "../store";
-import { settle, getLedger, toDateKey } from "../ledger";
+import { settle, getLedger, toDateKey, creditBalance } from "../ledger";
+import { pollPendingSettlements } from "../chain/settlementWatcher";
 import { emitNotice, latestNoticeFor } from "./notify";
 import type { BriefSnapshot, SpreadSample } from "./verify";
 
@@ -289,7 +290,7 @@ function buildDeps(rt: SopRuntime): SopDeps {
         return getStats().walletBalance;
       },
       credit(amount) {
-        recordSpend(-amount);
+        creditBalance(amount);
         return getStats().walletBalance;
       },
     },
@@ -334,6 +335,17 @@ export async function tick(req: { kind?: BountyKind; bountyId?: string }): Promi
     dailyBudgetUsdc: DAILY_BUDGET_USDC,
   };
   const result = await runSopTick(body, buildDeps(rt));
+  // 第三方悬赏：轮询链上付款；确认的收入同步进 guard 今日收入。
+  // 查询失败保持 pending，不影响 tick 结果。
+  try {
+    await pollPendingSettlements(Date.now(), {
+      onConfirmed: (_b, rev) => {
+        rt.guard.revenueTodayUsdc = Math.round((rt.guard.revenueTodayUsdc + rev) * 1e6) / 1e6;
+      },
+    });
+  } catch {
+    // 链上查询异常：pending 保持 pending
+  }
   // 每次 tick 结束后写回止损与后验；写失败 → 停机
   persistAfterTick(getLedger(), rt, result);
   return result;

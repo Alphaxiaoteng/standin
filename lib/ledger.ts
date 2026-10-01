@@ -87,7 +87,7 @@ export interface Stats {
   walletBalance: number;
 }
 
-export type LedgerEntryStatus = "SUCCESS" | "FAILED" | "INTERCEPTED" | "SKIPPED";
+export type LedgerEntryStatus = "SUCCESS" | "FAILED" | "INTERCEPTED" | "SKIPPED" | "PENDING";
 
 export interface SettlementInput {
   taskId: string;
@@ -140,7 +140,7 @@ export interface TradeInput {
   revenue?: number;
   net?: number;
   ts?: number;
-  status: "passed" | "failed" | "skipped" | "intercepted" | LedgerEntryStatus;
+  status: "passed" | "failed" | "skipped" | "intercepted" | "pending" | LedgerEntryStatus;
   reason?: string;
   taskId?: string;
   description?: string;
@@ -600,6 +600,8 @@ export class Ledger {
         normalizedStatus = "INTERCEPTED";
       } else if (entry.status === "skipped" || entry.status === "SKIPPED") {
         normalizedStatus = "SKIPPED";
+      } else if (entry.status === "pending" || entry.status === "PENDING") {
+        normalizedStatus = "PENDING";
       }
 
       const settled = this.settle({
@@ -769,6 +771,31 @@ export class Ledger {
     this.flush();
   }
 
+  /**
+   * 只增加钱包余额、不落账（收入账由调用方 settle 记录）。
+   * 取代旧实现"负数记账支出"的写法。
+   */
+  public creditBalance(amountUsdc: number): void {
+    this.state.stats.walletBalance = round6(this.state.stats.walletBalance + Math.max(0, amountUsdc));
+    this.flush();
+  }
+
+  /**
+   * 收入分账：demo（演示买方）与 onchain（链上确认）分别累计，永不相加。
+   * dateKey 缺省时不限日期（累计口径）。
+   */
+  public getRevenueSplit(dateKey?: string): { demoUsdc: number; onchainUsdc: number } {
+    let demoUsdc = 0;
+    let onchainUsdc = 0;
+    for (const e of this.state.entries) {
+      if (dateKey && e.dateKey !== dateKey) continue;
+      const billing = (e.meta as { billing?: unknown } | undefined)?.billing;
+      if (billing === "demo") demoUsdc += e.revenueUsdc || 0;
+      else if (billing === "onchain") onchainUsdc += e.revenueUsdc || 0;
+    }
+    return { demoUsdc: round6(demoUsdc), onchainUsdc: round6(onchainUsdc) };
+  }
+
   public recordIntercept(): void {
     this.state.stats.interceptCount += 1;
     this.flush();
@@ -839,6 +866,14 @@ export function addRehearsal(input: Omit<RehearsalRecord, "id">): RehearsalRecor
 
 export function recordSpend(amountUsdc: number): void {
   getLedger().recordSpend(amountUsdc);
+}
+
+export function creditBalance(amountUsdc: number): void {
+  getLedger().creditBalance(amountUsdc);
+}
+
+export function getRevenueSplit(dateKey?: string): { demoUsdc: number; onchainUsdc: number } {
+  return getLedger().getRevenueSplit(dateKey);
 }
 
 export function recordIntercept(): void {

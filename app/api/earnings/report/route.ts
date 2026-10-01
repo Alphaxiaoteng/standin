@@ -1,18 +1,31 @@
 /**
  * 今日账本 API：主页顶部三指标（收入、成本、净利）的唯一数据源。
  *
- * PRD §五：今日账本顶部三个数——收入、成本、净利，全部来自真实账本
- * （lib/ledger.ts，LedgerPersistence 维护），不写死任何数字。
- * 账本模块就绪前返回 503，前端显示"…",绝不编造。
+ * T5（漏洞 C）：收入按证据来源分账——
+ *   demoUsdc     演示买方（DEMO BUYER）本地演示结算
+ *   onchainUsdc  链上确认收入（USDC Transfer 回执，带交易哈希）
+ * 两者分开返回，前端不得相加成一个"净赚"。
+ * 请求时先跑一轮链上结算确认，转账后 30 秒内刷新即可见。
  */
 
 import { NextResponse } from "next/server";
-import { getLedgerSummary } from "@/lib/ledger";
+import { getLedgerSummary, getRevenueSplit, listLedgerEntries } from "@/lib/ledger";
 import { getStats } from "@/lib/store";
+import { listBounties } from "@/lib/market/bounties";
+import { pollPendingSettlements, agentAddress } from "@/lib/chain/settlementWatcher";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET() {
+  // 先做一轮链上结算轮询；查询失败不阻塞报告（保持 pending）
+  let settlementPoll: unknown;
+  try {
+    settlementPoll = await pollPendingSettlements(Date.now());
+  } catch (err) {
+    settlementPoll = { error: err instanceof Error ? err.message : String(err) };
+  }
+
   const summary = getLedgerSummary();
   if (!summary) {
     return NextResponse.json(
@@ -22,6 +35,37 @@ export async function GET() {
   }
 
   const stats = getStats();
+  const splitToday = getRevenueSplit(summary.dateKey);
+  const splitTotal = getRevenueSplit();
+
+  // 链上确认收入的交易回执（可点开）
+  const onchainTxs = listLedgerEntries(200)
+    .filter((e) => (e.meta as { billing?: unknown } | undefined)?.billing === "onchain" && e.revenueUsdc > 0)
+    .map((e) => {
+      const meta = e.meta as { payoutBlockNumber?: number; explorerUrl?: string } | undefined;
+      return {
+        taskId: e.taskId,
+        ts: e.ts,
+        revenueUsdc: e.revenueUsdc,
+        txHash: e.txHash,
+        blockNumber: meta?.payoutBlockNumber,
+        explorerUrl: meta?.explorerUrl,
+      };
+    });
+
+  // 待结算的第三方悬赏（pending）
+  const agent = agentAddress();
+  const pendingBounties = listBounties()
+    .filter((b) => b.buyerType === "third_party" && b.settlement === "pending")
+    .map((b) => ({
+      id: b.id,
+      title: b.title,
+      kind: b.kind,
+      rewardUsdc: b.rewardUsdc,
+      buyerAddress: b.buyerAddress,
+      expiresAt: b.expiresAt,
+    }));
+
   return NextResponse.json({
     today: {
       totalRevenueUsdc: summary.revenueUsdc,
@@ -30,6 +74,16 @@ export async function GET() {
       entryCount: summary.entryCount,
       dateKey: summary.dateKey,
     },
+    // 分账：演示收入与链上确认收入分开，永不相加
+    revenue: {
+      demoUsdc: splitToday.demoUsdc,
+      onchainUsdcToday: splitToday.onchainUsdc,
+      onchainUsdcTotal: splitTotal.onchainUsdc,
+    },
+    onchainTxs,
+    pendingBounties,
+    settlementAgentConfigured: agent !== null,
+    settlementPoll,
     walletBalanceUsdc: stats.walletBalance,
     protection: {
       // 本金保护：拦截避免损失从拦截记录推导（见 /api/intercepts）

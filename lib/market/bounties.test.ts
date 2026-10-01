@@ -11,6 +11,7 @@ import {
   listBounties,
   resetBountyCache,
   updateBountyStatus,
+  updateBountySettlement,
   type Bounty,
 } from "./bounties";
 
@@ -150,5 +151,51 @@ describe("storage robustness", () => {
     expect(listBounties({ path })).toEqual([]);
     const b = addBounty({ kind: "data_brief", rewardUsdc: 1 }, { path });
     expect(b.id).toMatch(/^bnty-/);
+  });
+});
+
+describe("T5 结算字段（settlement / buyerAddress / payoutTxHash）", () => {
+  it("defaults settlement by buyer type when reviving legacy files", () => {
+    const path = tmpPath();
+    writeFileSync(path, JSON.stringify({
+      version: 1, seq: 2,
+      bounties: [
+        { id: "legacy-demo", kind: "data_brief", rewardUsdc: 1, buyerType: "demo", createdAt: T0, expiresAt: T0 + 1000 },
+        { id: "legacy-3p", kind: "data_brief", rewardUsdc: 1, buyerType: "third_party", createdAt: T0, expiresAt: T0 + 1000 },
+      ],
+    }), "utf8");
+    resetBountyCache();
+    const list = listBounties({ path });
+    const byId = Object.fromEntries(list.map((b) => [b.id, b]));
+    expect(byId["legacy-demo"].settlement).toBe("confirmed");
+    expect(byId["legacy-3p"].settlement).toBe("pending");
+  });
+
+  it("addBounty stamps third-party buyerAddress and pending settlement", () => {
+    const path = tmpPath();
+    fresh({ path });
+    const b = addBounty({
+      kind: "data_brief", rewardUsdc: 1.5,
+      buyerType: "third_party", buyerName: "COMMUNITY BUYER",
+      buyerAddress: "0x1111111111111111111111111111111111111111",
+    }, { path });
+    expect(b.buyerAddress).toBe("0x1111111111111111111111111111111111111111");
+    expect(b.settlement).toBe("pending");
+    const demo = addBounty({ kind: "data_brief", rewardUsdc: 1, buyerAddress: "0xignored" }, { path });
+    expect(demo.buyerAddress).toBeUndefined();
+  });
+
+  it("updateBountySettlement persists payout receipt", () => {
+    const path = tmpPath();
+    fresh({ path });
+    const b = addBounty({ kind: "data_brief", rewardUsdc: 1, id: "pay-me", buyerType: "third_party" }, { path });
+    const updated = updateBountySettlement("pay-me", {
+      settlement: "confirmed", status: "done",
+      payoutTxHash: "0xdead", payoutBlockNumber: 12345,
+    }, { path });
+    expect(updated).toMatchObject({ settlement: "confirmed", status: "done", payoutTxHash: "0xdead", payoutBlockNumber: 12345 });
+    resetBountyCache();
+    expect(getBounty("pay-me", { path })).toMatchObject({ settlement: "confirmed", payoutTxHash: "0xdead" });
+    void b;
   });
 });
