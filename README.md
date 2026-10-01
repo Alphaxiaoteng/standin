@@ -37,8 +37,8 @@ Monad Metropolis · Track 04 — *Trust, Identity & AI Infrastructure* (Sep 1 �
 
 - 测试币没有价值，只证明机制成立
 - 账本里有亏损单；不出现「月收益」「年化」「稳赚」
-- 本地流水号不是链上哈希——我们不广播交易，也不虚构广播记录
-- 合约源码就绪、`forge test` 通过，但**部署状态以 `docs/SUBMISSION.md` 的实时核验为准**
+- 本地流水号不是链上哈希——App 逐笔不广播交易，也不虚构广播记录（仅一条裁决经手工锚定上链）
+- 合约已部署到 Monad testnet 10143（地址见下文部署表），**部署状态以 `docs/SUBMISSION.md` 的实时核验为准**
 - 不做真实资金交易，不构成投资建议
 
 ## 意图门禁：三个剧本，两个分支
@@ -85,7 +85,7 @@ curl -s -X POST https://testnet-rpc.monad.xyz -H 'Content-Type: application/json
 ```bash
 pnpm install
 pnpm build        # 构建验证
-pnpm vitest run   # 153 tests, 16 files
+pnpm test         # 203 tests / 17 files（2026-10-01 实测；test:core 覆盖 146）
 pnpm start -p 3313
 ```
 
@@ -109,4 +109,4 @@ docs/           SUBMISSION（提交包）/ BOUNTIES（bounty 对位）/ DEMO_SCR
 
 ## Why Monad
 
-Agent 的经济活动是高频、小额、连续的：每一单都要拉数据、比对、记账、结算。传统 EVM 的 Gas 成本与出块间隔让这种频率无法成立。Monad 的并行 EVM 与高速终局，让「每一笔微额支出都先过一道门禁再上链」从奢望变成默认动作。
+Agent 的经济活动是高频、小额、连续的：每一单都要拉数据、比对、记账、结算。传统 EVM 的 Gas 成本与出块间隔让这种频率无法成立。Monad 的并行 EVM 与高速终局，让「每一笔微额支出都先过一道门禁、可锚定上链」从奢望变成默认动作。

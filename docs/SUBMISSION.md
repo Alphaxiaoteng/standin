@@ -13,7 +13,7 @@
 
 | 产出 | 可核实锚点 |
 |---|---|
-| 单元测试 + 端到端测试全绿：153 passed / 16 files | `pnpm vitest run`（复现命令，实测输出 `Test Files 16 passed (16)`、`Tests 153 passed (153)`）；覆盖 `lib/*.test.ts`、`lib/agent/*.test.ts`、`lib/market/*.test.ts` |
+| 单元测试 + 端到端测试全绿：203 passed / 17 files（2026-10-01 实测） | `pnpm test`；`test:core` 覆盖 146（账本/市场/Agent 核心域）；测试经 vitest.setup.ts 全部落在临时目录，不触碰 .data/ |
 | 合约层测试 4 passed（访问控制、放行、冒名 Agent 拦截、周期限额滚动） | `cd contracts && forge test`；用例见 `contracts/test/StandInSecure.t.sol` |
 | 生产构建通过：exit 0，9 个业务页面 + 11 个 API 路由 | `pnpm build`（路由清单见构建输出 `Route (app)` 段；API 路由源文件 `app/api/**/route.ts`） |
 | 意图比对引擎：action / token / 收款方 / 金额超声明 / 无限授权 五类偏差检测 | `lib/rehearse.ts` `compareIntent()` |
@@ -76,7 +76,7 @@
 | Live Demo URL | **待完成** | 仓库已含完整 Next.js 生产构建（`pnpm build` exit 0）；需登录 Vercel/Railway 一键部署（CLI 已装但无凭据，见阻塞项） |
 | 代码仓库（公开） | ✅ 已完成 | https://github.com/Alphaxiaoteng/standin （public，20 commit 全量增量历史，评委可逐条核验六周内构建） |
 | 部署证明与交易哈希 | ✅ **已完成** | 两合约已真实部署（`eth_getCode` 非空字节码），部署交易哈希与块号见 §一.1 部署状态行。一份拦截裁决已锚定上链（块 67218203，`allowed=false`）。评委可运行 `curl` 命令独立复核。 |
-| 测试与构建快照 | 已完成 | `pnpm vitest run` 153 passed / 16 files；`cd contracts && forge test` 4 passed；`pnpm build` exit 0 |
+| 测试与构建快照 | 已完成（2026-10-01 复测） | `pnpm test` 203 passed / 17 files；`pnpm build` 通过；合约核对：`eth_getCode` StandInAnchor 4466 字节、PaymentVault.anchor() 返回 0x5140…930（与部署记录一致） |
 
 **立即待办（按优先级）**：① 部署 Live Demo（`npx vercel login` 后 `npx vercel deploy --prod`）；② 按 `docs/DEMO_SCRIPT.md` 录制真人解说视频；③ 合约上链后回填真实 tx 哈希（**已完成**）。
 

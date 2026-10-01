@@ -183,6 +183,13 @@
 - Hacker News `GET /v0/topstories.json`:200,1.07s;首条 item:200,1.02s
 - 二次实测发现：CoinGecko 同一分钟返回 83910 与 83877（21.7bps 漂移到 61.1bps），Coinbase 稳定 83928.255——**真实价差偶尔越 50bps 容忍带，任务 A 会自然失败产生亏损单**。这是特性不是 bug，符合"真实数据裁决，收入不是写死的"。
 
+本机探测记录（2026-10-01，T9 复测，curl -m 8）：
+
+- Coinbase `GET /v2/prices/BTC-USD/spot`：200，1.23s
+- CoinGecko `GET /api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd`：200，0.45s
+- Hacker News `GET /v0/topstories.json`：200，1.10s
+- Kraken `GET /0/public/Ticker?pair=XBTUSD`：200，0.77s（T2 新增第三方源；测试网 RPC 对 eth_getLogs 限 100 块窗口，结算扫描段设 90）
+
 ## 来源
 
 [1] Crypto API Pricing Plans - CoinGecko https://www.coingecko.com/en/api/pricing

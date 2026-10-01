@@ -169,7 +169,7 @@ function seedBountyStore(now: number): BountyStoreFile {
       {
         id: "bnty-seed-03",
         kind: "data_brief",
-        title: "高频快报 · 套利研判",
+        title: "高频快报 · 价差研判",
         description: "深度聚合多源快报，核验真实深度，超时或越带将判定验收未通过记亏。",
         rewardUsdc: 2.5,
         costUsdc: 0.5,
