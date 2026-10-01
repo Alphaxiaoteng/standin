@@ -62,8 +62,15 @@ export async function GET() {
     consecutiveLossesByKind: liveGuard.consecutiveLossesByKind,
   });
 
-  // 选中卡片携带完整打分字段供决策卡展示
-  const selectedCards = scored.filter((o) => selected.some((s) => s.id === o.id));
+  // 选中卡片携带完整打分字段供决策卡展示（含数据源健康数，T8 界面四行之一）
+  const selectedCards = scored
+    .filter((o) => selected.some((s) => s.id === o.id))
+    .map((o) => ({
+      ...o,
+      sourceHealth: sourcesForKind(o.kind).map(
+        (name) => healthMap[name] ?? { name, score: 0, healthy: false },
+      ),
+    }));
 
   return NextResponse.json({
     opportunities: selectedCards,
