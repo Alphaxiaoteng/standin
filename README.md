@@ -79,14 +79,21 @@ curl -s -X POST https://testnet-rpc.monad.xyz -H 'Content-Type: application/json
 # 返回非空字节码（codesize≈2232 字节）—— 证明已部署，非 0x
 ```
 
-一份真实拦截裁决已锚定上链：钓鱼剧本（`Recipient mismatch`）的 keccak256 报告哈希 `0x4a84ed18…f933` 通过 `anchor()` 写入区块 67218203，读回 `allowed=false`、`totalBlocked=1`。链上状态与本地 `compareIntent()` 算出的哈希是同一个值。部署证明见 `contracts/broadcast/Deploy.s.sol/10143/run-latest.json`。
+一份真实拦截裁决已锚定上链：钓鱼剧本（`Recipient mismatch`）的 keccak256 报告哈希 `0x4a84ed18…f933` 通过 `anchor()` 写入区块 67218203（tx [`0x2a25b9a6…2b1a`](https://testnet.monadvision.com/tx/0x2a25b9a68eee7e8eb786c10c6fa05fd62e3b0bfb06dccdf09c4eb14d7c982b1a)），读回 `allowed=false`、`totalBlocked=1`。链上状态与本地 `compareIntent()` 算出的哈希是同一个值。部署证明见 `contracts/broadcast/Deploy.s.sol/10143/run-latest.json`。
+
+以上全部主张可一条命令只读复核（无需私钥）：
+
+```bash
+(cd contracts && forge build) && node scripts/verify-onchain.mjs
+# 11 项 PASS：部署交易、接线、锚定裁决，以及本地源码编译产物与链上运行时字节码一致
+```
 
 ## 运行
 
 ```bash
 pnpm install
 pnpm build        # 构建验证
-pnpm test         # 203 tests / 17 files（2026-10-01 实测；test:core 覆盖 146）
+pnpm test         # 210 tests / 20 files（2026-10-12 实测；test:core 覆盖 147）
 pnpm start -p 3313
 ```
 

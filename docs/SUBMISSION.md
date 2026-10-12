@@ -13,9 +13,9 @@
 
 | 产出 | 可核实锚点 |
 |---|---|
-| 单元测试 + 端到端测试全绿：203 passed / 17 files（2026-10-01 实测） | `pnpm test`；`test:core` 覆盖 146（账本/市场/Agent 核心域）；测试经 vitest.setup.ts 全部落在临时目录，不触碰 .data/ |
+| 单元测试 + 端到端测试全绿：210 passed / 20 files（2026-10-12 实测） | `pnpm test`；`test:core` 覆盖 147（账本/市场/Agent 核心域）；测试经 vitest.setup.ts 全部落在临时目录，不触碰 .data/ |
 | 合约层测试 4 passed（访问控制、放行、冒名 Agent 拦截、周期限额滚动） | `cd contracts && forge test`；用例见 `contracts/test/StandInSecure.t.sol` |
-| 生产构建通过：exit 0，9 个业务页面 + 11 个 API 路由 | `pnpm build`（路由清单见构建输出 `Route (app)` 段；API 路由源文件 `app/api/**/route.ts`） |
+| 生产构建通过：exit 0，9 个业务页面 + 13 个 API 路由 | `pnpm build`（路由清单见构建输出 `Route (app)` 段；API 路由源文件 `app/api/**/route.ts`） |
 | 意图比对引擎：action / token / 收款方 / 金额超声明 / 无限授权 五类偏差检测 | `lib/rehearse.ts` `compareIntent()` |
 | 彩排报告哈希为真实 keccak256（任务 + 声明意图 + 实际 calldata），非可碰撞近似 | `lib/runner.ts` `generateReportHash()`；commit `571ef78` |
 | SOP 状态机八步闭环：发现→打分→选择→门禁→执行→验收→结算→复盘，全分支记账 | `lib/agent/sop.ts` `runSopTick()`；装配真实端口 `lib/agent/sopRuntime.ts` |
@@ -25,10 +25,11 @@
 | 止损在 Agent 之外强制：当日净亏 ≥30% 停手、连亏 3 单暂停类型、单笔超上限直拒 | `lib/agent/guard.ts`（`DAILY_LOSS_HALT_FRACTION = 0.3`） |
 | 账本持久化带回滚：落盘 `.data/ledger.json`，原子写（临时文件 + `renameSync`），写失败回滚内存态并停机 | `lib/ledger.ts` `flush()` / `withRollback()` / `setHalted()`；`grep -n "renameSync" lib/ledger.ts` |
 | 链上金库状态机（合约源码）：放款只认 Anchor 中 `allowed=true` 的报告，并强校验 Agent 身份、策略限额、周期限额、余额；`forge test` 4 passed | `contracts/src/PaymentVault.sol` `release()`；`contracts/src/StandInAnchor.sol` |
-| 合约部署状态 | **已部署**。`StandInAnchor` `0x514047b2a6a06ed8c324b919774b4f751b61c930`（块 67217565，tx `0x45d41250…b68c`）、`PaymentVault` `0x499707245d853425c1a2b503e5f065acdde89929`（块 67217574，tx `0xaf09a2d2…bc6f`）；`vault.anchor()` 接线正确。`eth_getCode` 返回非空字节码（codesize 2232 / 3561）。一份拦截裁决已锚定（块 67218203，`allowed=false`）。部署证明 `contracts/broadcast/Deploy.s.sol/10143/run-latest.json`。 |
+| 合约部署状态 | **已部署**。`StandInAnchor` `0x514047b2a6a06ed8c324b919774b4f751b61c930`（块 67217565，tx `0x45d41250…b68c`）、`PaymentVault` `0x499707245d853425c1a2b503e5f065acdde89929`（块 67217574，tx `0xaf09a2d2…bc6f`）；`vault.anchor()` 接线正确。`eth_getCode` 返回非空字节码（codesize 2232 / 3561）。一份拦截裁决已锚定（块 67218203，tx `0x2a25b9a6…2b1a`，`allowed=false`）。部署证明 `contracts/broadcast/Deploy.s.sol/10143/run-latest.json`。 |
+| 源码与链上一致 | 本地 `forge build` 的 `StandInAnchor` 运行时字节码与链上**逐字节相同**；`PaymentVault` 仅构造时写入的 immutable `anchor` 地址槽不同，其余相同。`(cd contracts && forge build) && node scripts/verify-onchain.mjs` → 11 项 PASS（只读，无需私钥） |
 | CI 合约流水线 | `contracts/.github/workflows/test.yml`（Foundry fmt/build/test） |
 
-诚实说明：提交范围即 `git ls-files` 所列内容；`lib/long-running-app-harness/`、`lib/cluster/`、`lib/monitoring/` 为无关脚手架，已按 `.gitignore` 排除且不参与 vitest；`docs/FINAL_ACCEPTANCE_REPORT.md` / `IMPLEMENTATION_SUMMARY.md` / `COMPLETE_GUIDE.md` / `SECURITY_AUDIT.md` 描述的是上述被排除模块，不作为本次提交的技术依据。
+诚实说明：提交范围即 `git ls-files` 所列内容；`lib/long-running-app-harness/`、`lib/cluster/`、`lib/monitoring/` 为无关脚手架，已按 `.gitignore` 排除且不参与 vitest；描述这些模块的旧文档与校验脚本已于 2026-10-12 移出仓库。
 
 ### 2. Innovation & Originality（稀缺新范式，而非换皮）
 
@@ -60,7 +61,7 @@
 |---|---|
 | 端到端闭环有自动化证明：合法任务产出可驱动 `PaymentVault.release` 的凭据，被拦截任务产出的报告 `allowed` 恒为 false，合约层拒绝 | `lib/e2e.test.ts` 两条全周期用例（`pnpm vitest run` 内） |
 | 链上合约真实承载"放行"这一步：测试中完成 deposit → promote → release → 余额与周期限额断言 | `contracts/test/StandInSecure.t.sol` `test_Vault_Release_Success` |
-| 交易执行路径有开发接口与文档：策略创建 / 撤销 / 流水 / 拦截 / 彩排共 11 个 API 路由 | `app/api/**/route.ts`；`app/developer/page.tsx` 接口表 |
+| 交易执行路径有开发接口与文档：策略创建 / 撤销 / 流水 / 拦截 / 彩排 / 机会 / 悬赏 / 身份等共 13 个 API 路由 | `app/api/**/route.ts`；`app/developer/page.tsx` 接口表 |
 | 亏损真实存在于账本：`.data/ledger.json` 含净利为负的记录（如 `led-seed-1` net -0.50、`led-seed-2` net -1.25） | `node -e "const l=require('./.data/ledger.json');console.log(l.entries.filter(e=>e.netUsdc<0))"` |
 | Startup 方向（如实陈述，不夸大）：把"Agent 花钱"变成"有门禁、有留痕、可核验"的基础设施；开发者接入面已成型（API + curl 样例 + SDK 片段） | `app/developer/page.tsx` `SDK_SNIPPET` |
 
@@ -74,9 +75,9 @@
 | 方案介绍与 Why Monad | 已完成（见本文档 §三） | 高吞吐低成本的 EVM 测试网让「每笔彩排报告都先比对意图再放款」在演示规模下可行。合约已部署到 10143（见 §一.1 部署状态行），链上锚定已通过钓鱼拦截交易验证。 |
 | Demo 视频（2-3 分钟） | **待完成** | 按 `docs/DEMO_SCRIPT.md`（3:08 逐镜脚本）录制；**官方规则禁止 AI 合成语音，必须真人解说** |
 | Live Demo URL | **待完成** | 仓库已含完整 Next.js 生产构建（`pnpm build` exit 0）；需登录 Vercel/Railway 一键部署（CLI 已装但无凭据，见阻塞项） |
-| 代码仓库（公开） | ✅ 已完成 | https://github.com/Alphaxiaoteng/standin （public，20 commit 全量增量历史，评委可逐条核验六周内构建） |
+| 代码仓库（公开） | ✅ 已完成 | https://github.com/Alphaxiaoteng/standin （public，全量增量提交历史，`git log` 可逐条核验均在比赛期内构建） |
 | 部署证明与交易哈希 | ✅ **已完成** | 两合约已真实部署（`eth_getCode` 非空字节码），部署交易哈希与块号见 §一.1 部署状态行。一份拦截裁决已锚定上链（块 67218203，`allowed=false`）。评委可运行 `curl` 命令独立复核。 |
-| 测试与构建快照 | 已完成（2026-10-01 复测） | `pnpm test` 203 passed / 17 files；`pnpm build` 通过；合约核对：`eth_getCode` StandInAnchor 4466 字节、PaymentVault.anchor() 返回 0x5140…930（与部署记录一致） |
+| 测试与构建快照 | 已完成（2026-10-12 复测） | `pnpm test` 210 passed / 20 files；`pnpm build` 通过；`forge test` 4 passed；`node scripts/verify-onchain.mjs` 11 项 PASS（StandInAnchor codesize 2232 字节、PaymentVault.anchor() 返回 0x5140…930、源码编译产物与链上字节码一致） |
 
 **立即待办（按优先级）**：① 部署 Live Demo（`npx vercel login` 后 `npx vercel deploy --prod`）；② 按 `docs/DEMO_SCRIPT.md` 录制真人解说视频；③ 合约上链后回填真实 tx 哈希（**已完成**）。
 

@@ -5,8 +5,9 @@
 官方奖项清单以 [monad.xyz/metropolis](https://monad.xyz/metropolis) 为准。下面每一项都标「已具备」或「待补」，待补的写清缺什么。不夸大：不合适就直说。
 
 本仓库当前可核验的硬事实：
-- 测试：`pnpm vitest run` → 153 passed / 16 files。
-- 构建：`pnpm build` → exit 0，9 业务页面 + 11 API 路由。
+- 测试：`pnpm test` → 210 passed / 20 files（2026-10-12 复测）。
+- 构建：`pnpm build` → exit 0，9 业务页面 + 13 API 路由。
+- 链上主张一键复核：`node scripts/verify-onchain.mjs` → 11 项 PASS（含本地编译产物与链上运行时字节码一致）。
 - 合约**已真实部署**到 Monad testnet（chainId 10143，`eth_getCode` 非空字节码）：`StandInAnchor` `0x514047b2a6a06ed8c324b919774b4f751b61c930`（块 67217565，tx `0x45d41250…b68c`）、`PaymentVault` `0x499707245d853425c1a2b503e5f065acdde89929`（块 67217574，tx `0xaf09a2d2…bc6f`）；`vault.anchor()` 读回 `0x5140…c930` 接线正确。部署证明 `contracts/broadcast/Deploy.s.sol/10143/run-latest.json`。
 - 一份真实拦截裁决已手工锚定上链（机制验证，非逐笔自动上链）：钓鱼剧本报告哈希 `0x4a84ed18…f933` 经 `anchor()` 写入块 67218203，链上读回 `allowed=false`、`totalBlocked=1`，与本地 `compareIntent()` 的 keccak256 同值。
 - 合约测试：`cd contracts && forge test` → **4 passed**（访问控制 / 周期轮转 / 放行成功 / 流氓 Agent 被拦截）。

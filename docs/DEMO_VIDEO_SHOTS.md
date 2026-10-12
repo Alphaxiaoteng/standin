@@ -70,12 +70,12 @@
 ### 镜头 7 · 2:28–2:52（24s）工程可信度（终端实拍，快切）
 - **画面**：切到终端，真实运行两条命令并停在结果；再切到合约源码目录与合约测试输出。
 - **屏幕动线**（终端，逐条回车后硬跳切到输出）：
-  1. `pnpm test` → 末行停在 **203 passed / 17 files**（2026-10-01 实测）。
-  2. `pnpm build` → 末行 exit 0，路由清单停在 **9 个业务页面 + 11 个 API 路由**。
-  3. 展示合约源码目录 `contracts/src/`（StandInAnchor、PaymentVault）与通过测试 `forge test` → **4 passed**。可展示 broadcast 部署记录（`contracts/broadcast/Deploy.s.sol/10143/run-latest.json`）与 `eth_getCode` 非空字节码作为已部署证明。
+  1. `pnpm test` → 末行停在 **210 passed / 20 files**（2026-10-12 实测）。
+  2. `pnpm build` → 末行 exit 0，路由清单停在 **9 个业务页面 + 13 个 API 路由**。
+  3. 展示合约源码目录 `contracts/src/`（StandInAnchor、PaymentVault）与通过测试 `forge test` → **4 passed**；再跑 `node scripts/verify-onchain.mjs` → **11 项 PASS**，末两行「本地源码编译产物 = 链上运行时字节码」作为已部署且源码一致的证明。
   4. 屏幕列出：合约源码 `contracts/src/`（StandInAnchor 锚定报告哈希、PaymentVault 托管本金）、合约测试 `forge test` 4 passed；数据源 CoinGecko / Coinbase / Hacker News；账本落盘带回滚。可列合约地址（已真实部署），但**不暗示逐笔上链**——App 逐笔记录仍是本地账本。
 - **旁白**（字数≈92）：
-  > 底层不是空壳。203 个单元与端到端测试全绿（2026-10-01 实测），业务页面与接口一次构建通过；两个合约——锚定彩排报告的 StandInAnchor 和托管本金的 PaymentVault——**已部署到 Monad 测试网**，字节码可在链上验证，一条真实拦截裁决已手工锚定上链作为机制证明；App 的逐笔记录仍在本地账本，逐笔自动锚定尚未接入，我们不夸大。行情和热点来自 CoinGecko、Coinbase、Hacker News 三个真实源，账本落盘、写失败会回滚并停机。
+  > 底层不是空壳。210 个单元与端到端测试全绿，业务页面与接口一次构建通过；两个合约——锚定彩排报告的 StandInAnchor 和托管本金的 PaymentVault——**已部署到 Monad 测试网**，仓库源码编译出的字节码和链上逐字节一致，一条真实拦截裁决已手工锚定上链作为机制证明；App 的逐笔记录仍在本地账本，逐笔自动锚定尚未接入，我们不夸大。行情和热点来自 CoinGecko、Coinbase、Hacker News 三个真实源，账本落盘、写失败会回滚并停机。
 - **要点**：命令要**现场真跑**（或用刚跑完的真实输出画面），不摆拍、不伪造测试数。
 
 ### 镜头 8 · 2:52–3:08（16s）局限声明 + 收尾
