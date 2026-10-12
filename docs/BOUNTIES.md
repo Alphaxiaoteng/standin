@@ -8,7 +8,7 @@
 - 测试：`pnpm vitest run` → 153 passed / 16 files。
 - 构建：`pnpm build` → exit 0，9 业务页面 + 11 API 路由。
 - 合约**已真实部署**到 Monad testnet（chainId 10143，`eth_getCode` 非空字节码）：`StandInAnchor` `0x514047b2a6a06ed8c324b919774b4f751b61c930`（块 67217565，tx `0x45d41250…b68c`）、`PaymentVault` `0x499707245d853425c1a2b503e5f065acdde89929`（块 67217574，tx `0xaf09a2d2…bc6f`）；`vault.anchor()` 读回 `0x5140…c930` 接线正确。部署证明 `contracts/broadcast/Deploy.s.sol/10143/run-latest.json`。
-- 一份真实拦截裁决已上链：钓鱼剧本报告哈希 `0x4a84ed18…f933` 经 `anchor()` 写入块 67218203，链上读回 `allowed=false`、`totalBlocked=1`，与本地 `compareIntent()` 的 keccak256 同值。
+- 一份真实拦截裁决已手工锚定上链（机制验证，非逐笔自动上链）：钓鱼剧本报告哈希 `0x4a84ed18…f933` 经 `anchor()` 写入块 67218203，链上读回 `allowed=false`、`totalBlocked=1`，与本地 `compareIntent()` 的 keccak256 同值。
 - 合约测试：`cd contracts && forge test` → **4 passed**（访问控制 / 周期轮转 / 放行成功 / 流氓 Agent 被拦截）。
 
 核心门禁实现（下面反复引用）：
@@ -41,7 +41,7 @@ Guard Mode 的「限额内自主、超限拦截/2FA」与我们做的几乎逐�
 **我们凭什么申报（指向具体实现）：**
 - 策略模型已成型且落盘：`app/api/policies/route.ts`（单笔上限、周上限、收款方 `merchantHash`、`expires`，全部服务端校验）+ `app/api/policies/revoke/route.ts`（撤销），UI 在 `app/wallet/page.tsx`。这套字段形状和 Guard Mode 的 allowlist + per-tx + outflow limit 一一对应，直接可映射成策略。
 - 门禁与放行/拦截裁决：`lib/rehearse.ts` + `lib/runner.ts` + `lib/scenarios.ts`，三剧本 `allowed→EXECUTED` / `phishing→INTERCEPTED（避免损失 0.50 USDC）` / `infinite→INTERCEPTED（避免损失 1.00 USDC）`，避免损失金额是 `lib/agent/avoidedLoss.ts` 从真实彩排记录推导，非写死。
-- 裁决锚定与限额托管的**合约实现**：`StandInAnchor.sol`（放行/拦截都锚定，`totalAnchored` / `totalBlocked` 计数）+ `PaymentVault.sol`（限额内放款，报告不一致直接 revert），`forge test` 4 passed。**注意：合约尚未部署，地址上没有字节码**（见上文核验）；它现在是「可编译可测的合约代码」，不是「已上链的证明」。申报时如果写了部署，会被评委用 `eth_getCode` 当场戳穿。
+- 裁决锚定与限额托管的**合约实现**：`StandInAnchor.sol`（放行/拦截都锚定，`totalAnchored` / `totalBlocked` 计数）+ `PaymentVault.sol`（限额内放款，报告不一致直接 revert），`forge test` 4 passed。**已真实部署**到 Monad testnet 10143（地址与部署 tx 见上文核验；`eth_getCode` 非空字节码，已有一条真实裁决手工锚定，块 67218203）。但 App 的**逐笔裁决仍是本地账本，逐笔自动上链锚定尚未接入**——不要把「合约在链上」说成「每笔都上链」。
 - 插件开发经验：工作区已有 `../earner-dsh-plugin/index.js`（`mm`-风格的命令式插件：4 条工具、manifest、`inject`、`apply(ctx, config)`）。**如实说明：那是 DSH/DeepSeek agent 宿主的插件（`@deepseek-ai/schemastery`），不是 `@metamask/agent-wallet`。命令式插件的写法经验可复用，但目标 SDK 不同，MetaMask 插件仍需从零按官方模板实现。**
 
 **状态：核心机制「已具备」，MetaMask 插件「待补」。**
@@ -141,7 +141,7 @@ Guard Mode 的「限额内自主、超限拦截/2FA」与我们做的几乎逐�
 
 | Bounty | 金额 | 状态 | 主攻/备选 |
 |---|---|---|---|
-| MetaMask Best Agent Wallet Plugin | $2,500 | 门禁/策略已具备；合约可编译可测（**未部署**）；`@metamask/agent-wallet` 插件包待补 | **首选**，与核心最契合 |
+| MetaMask Best Agent Wallet Plugin | $2,500 | 门禁/策略已具备；合约已部署到 10143（逐笔自动锚定待接）；`@metamask/agent-wallet` 插件包待补 | **首选**，与核心最契合 |
 | Perpl Best Analytics / Risk Tool | $3,000 | 风险拦截引擎已具备；Perpl API 数据源完全待补 | 第二，补 Perpl 集成才不虚 |
 | Qwen Best Builds with Qwen 3.8 Max | $5,000 credits（非现金） | 无 LLM 调用；NL→Intent 挂点待接 | 第三，加分广度项，措辞守红线 |
 | Privy! | $5,000 | 完全待补，无依赖无登录无钱包打通 | 不建议主攻（与 MetaMask 重叠、主线相关性弱一档） |

@@ -65,7 +65,7 @@ export interface RunOutcome {
 /**
  * 跑一次剧本：彩排门禁 → 落库（交易 / 拦截 / 彩排详情）→ 更新统计。
  * 全流程在本地账本完成，不广播任何交易；txHash 字段是本地流水号，非链上哈希。
- * PaymentVault 合约已编写并通过 forge test，但尚未部署。
+ * PaymentVault 合约已部署到 Monad testnet 10143（App 逐笔记录不自动上链）。
  */
 export function runScenario(kind: ScenarioKind): RunOutcome {
   const task = SCENARIOS[kind];

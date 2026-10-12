@@ -125,8 +125,9 @@ export default function InterceptsPage() {
 
       <div className="notice">
         <span>
-          每次拦截都会生成彩排报告并写入本地账本。`StandInAnchor` 合约源码已就绪并通过
-          合约测试，但**尚未部署**，因此这里的记录是链下账本，不是链上证明。测试网测试币没有价值，
+          每次拦截都会生成彩排报告并写入本地账本。StandInAnchor 合约已部署到 Monad 测试网
+          （chainId 10143）；我们已把一份真实拦截裁决单独锚定上链作为机制验证（报告哈希用与本页
+          相同的 keccak256 计算，链上读回 allowed=false），但本页面逐笔记录仍是本地账本，逐笔自动上链锚定尚未接入。测试网测试币没有价值，
           这里量化的"避免损失"只证明保护机制真实生效，不构成投资建议。
         </span>
       </div>
