@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   addIntercept,
+  creditBalance,
   addPolicy,
   addRehearsal,
   addTransaction,
@@ -28,72 +29,23 @@ beforeEach(() => {
   resetStore();
 });
 
-describe("store - 种子数据", () => {
-  it("预置至少一条策略，且字段完整", () => {
-    const policies = listPolicies();
-    expect(policies.length).toBeGreaterThan(0);
-
-    const p = policies[0];
-    expect(p.id).toMatch(/^pol-/);
-    expect(typeof p.agent).toBe("string");
-    expect(p.agent.length).toBeGreaterThan(0);
-    expect(p.merchantHash).toMatch(/^0x[0-9a-fA-F]+$/);
-    expect(p.maxPerTx).toBeGreaterThan(0);
-    expect(p.maxPerWeek).toBeGreaterThan(0);
-    expect(p.expires).toBeGreaterThan(Date.now());
-    expect(p.active).toBe(true);
+describe("store - 空账本起步", () => {
+  it("不预置策略、流水、拦截或彩排", () => {
+    expect(listPolicies()).toEqual([]);
+    expect(listTransactions()).toEqual([]);
+    expect(listIntercepts()).toEqual([]);
+    expect(listRehearsals()).toEqual([]);
+    expect(getLatestRehearsal()).toBeNull();
   });
 
-  it("预置交易流水，字段可渲染且金额以 USDC 人类单位计价", () => {
-    const txs = listTransactions();
-    expect(txs.length).toBeGreaterThan(0);
-
-    for (const t of txs) {
-      expect(t.id).toMatch(/^tx-/);
-      expect(t.ts).toBeGreaterThan(0);
-      expect(t.to).toMatch(/^0x/);
-      expect(typeof t.amount).toBe("number");
-      expect(t.amount).toBeGreaterThan(0);
-      expect(t.status).toBe("EXECUTED");
-      expect(t.txHash).toMatch(/^0x/);
-      expect(t.reportHash).toMatch(/^0x/);
-    }
-  });
-
-  it("预置拦截记录，含声明 vs 实际收款方", () => {
-    const items = listIntercepts();
-    expect(items.length).toBeGreaterThan(0);
-
-    for (const i of items) {
-      expect(i.id).toMatch(/^it-/);
-      expect(i.taskId.length).toBeGreaterThan(0);
-      expect(i.scenario.length).toBeGreaterThan(0);
-      expect(i.reason.length).toBeGreaterThan(0);
-      expect(i.declaredTo).toMatch(/^0x/);
-      expect(i.actualTo).toMatch(/^0x/);
-      expect(i.reportHash).toMatch(/^0x/);
-    }
-  });
-
-  it("预置最近一次彩排详情", () => {
-    expect(listRehearsals().length).toBeGreaterThan(0);
-
-    const latest = getLatestRehearsal();
-    expect(latest).not.toBeNull();
-    expect(latest!.id).toMatch(/^rh-/);
-    expect(latest!.declaredIntent.to).toMatch(/^0x/);
-    expect(latest!.actualCalldata.to).toMatch(/^0x/);
-    expect(typeof latest!.allowed).toBe("boolean");
-    expect(Array.isArray(latest!.reasons)).toBe(true);
-  });
-
-  it("stats 三个指标均为有限数值", () => {
+  it("统计从零开始，且为有限数值", () => {
     const s = getStats();
+    expect(s.todaySpent).toBe(0);
+    expect(s.interceptCount).toBe(0);
+    expect(s.walletBalance).toBe(0);
     expect(Number.isFinite(s.todaySpent)).toBe(true);
     expect(Number.isFinite(s.interceptCount)).toBe(true);
     expect(Number.isFinite(s.walletBalance)).toBe(true);
-    expect(s.interceptCount).toBeGreaterThan(0);
-    expect(s.walletBalance).toBeGreaterThan(0);
   });
 
   it("列表按时间倒序返回（最新在前）", () => {
@@ -113,9 +65,9 @@ describe("store - 种子数据", () => {
     resetStore();
 
     const s = getStats();
-    expect(s.todaySpent).toBeCloseTo(1.75, 6);
-    expect(s.interceptCount).toBe(2);
-    expect(s.walletBalance).toBeCloseTo(248.25, 6);
+    expect(s.todaySpent).toBe(0);
+    expect(s.interceptCount).toBe(0);
+    expect(s.walletBalance).toBe(0);
   });
 });
 
@@ -128,6 +80,22 @@ describe("store - 读取隔离", () => {
   });
 
   it("列表返回副本，外部修改元素不污染存储", () => {
+    addTransaction({
+      ts: Date.now(),
+      to: LEGIT,
+      amount: 0.5,
+      token: "USDC",
+      status: "EXECUTED",
+      txHash: "0xabc",
+      reportHash: "0xdef",
+    });
+    addPolicy({
+      agent: "0xAgent_Test_Bound",
+      merchantHash: "0xdeadbeef",
+      maxPerTx: 3,
+      maxPerWeek: 30,
+      expires: Date.now() + 86_400_000,
+    });
     const before = listTransactions()[0].amount;
     const snapshot = listTransactions();
     snapshot[0].amount = 999999;
@@ -271,6 +239,7 @@ describe("store - 交易与拦截记录追加", () => {
 
 describe("store - stats 更新", () => {
   it("recordSpend 累加今日支出并扣减余额", () => {
+    creditBalance(10);
     const before = getStats();
     recordSpend(0.5);
     const after = getStats();
@@ -296,6 +265,7 @@ describe("store - stats 更新", () => {
   });
 
   it("连续记账累加正确且无浮点噪声泄漏", () => {
+    creditBalance(10);
     const before = getStats();
     recordSpend(0.1);
     recordSpend(0.2);

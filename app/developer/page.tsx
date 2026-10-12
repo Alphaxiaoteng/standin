@@ -19,12 +19,10 @@ const API_ENDPOINTS: { method: string; path: string; desc: string }[] = [
   { method: "POST", path: "/api/agent/run", desc: "运行剧本：allowed / phishing / infinite" },
 ];
 
-const CURL_STATS = `curl -s http://localhost:3000/api/stats \\
-  -H "Authorization: Bearer $STANDIN_API_KEY"`;
+const CURL_STATS = `curl -s http://127.0.0.1:3313/api/stats`;
 
-const CURL_CREATE = `curl -s -X POST http://localhost:3000/api/policies \\
+const CURL_CREATE = `curl -s -X POST http://127.0.0.1:3313/api/policies \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer $STANDIN_API_KEY" \\
   -d '{
     "agent": "0x1111111111111111111111111111111111111111",
     "merchantHash": "0x2222222222222222222222222222222222222222",
@@ -33,9 +31,8 @@ const CURL_CREATE = `curl -s -X POST http://localhost:3000/api/policies \\
     "expires": 1798761600000
   }'`;
 
-const CURL_RUN = `curl -s -X POST http://localhost:3000/api/agent/run \\
+const CURL_RUN = `curl -s -X POST http://127.0.0.1:3313/api/agent/run \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer $STANDIN_API_KEY" \\
   -d '{ "scenario": "phishing" }'`;
 
 const ENVELOPE_NOTE = `// 列表接口统一包一层键名
@@ -100,22 +97,18 @@ export default function DeveloperPage() {
       />
 
       <div className="grid grid-2">
-        <Card title="API Key" desc="占位值，正式环境请在服务端注入，不要写入前端代码">
+        <Card title="怎么调用" desc="当前演示不校验 API Key，没有预置密钥">
           <div className="stack" style={{ gap: 12 }}>
             <dl className="kv">
-              <dt>Key</dt>
-              <dd>
-                <span className="mono">sk_live_standin_xxxxxxxxxxxxxxxxxxxxxx</span>
-              </dd>
-              <dt>权限</dt>
-              <dd>只读指标 · 策略读写 · 触发剧本</dd>
+              <dt>鉴权</dt>
+              <dd>无。不要把示例密钥当成已签发的凭证。</dd>
               <dt>Base URL</dt>
               <dd>
-                <span className="mono">http://localhost:3000</span>
+                <span className="mono">http://127.0.0.1:3313</span>
               </dd>
             </dl>
             <div className="notice">
-              <span>所有写操作都应在服务端发起；前端控制台仅用于观测与调试。</span>
+              <span>本机 `pnpm start -p 3313` 之后，下面的 curl 可以直接打。写操作没有登录态。</span>
             </div>
           </div>
         </Card>

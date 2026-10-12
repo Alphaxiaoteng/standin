@@ -13,6 +13,7 @@ import type { Bounty } from "../components/types";
 import { BOUNTY_STATUS_LABEL, formatAmount, formatAgo, formatTime } from "../components/format";
 import { Badge, Card, DataState } from "../components/ui";
 import { IconFlag, IconPlus } from "../components/icons";
+import { useWallet } from "../components/WalletProvider";
 
 const KIND_LABEL: Record<Bounty["kind"], string> = {
   data_brief: "数据简报",
@@ -29,6 +30,7 @@ export default function BountiesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const wallet = useWallet();
 
   const reload = useCallback(() => {
     void fetchBounties().then(setBounties);
@@ -60,10 +62,16 @@ export default function BountiesPage() {
       {formOpen && (
         <BountyForm
           busy={busy}
+          payer={wallet.address}
           onCancel={() => setFormOpen(false)}
           onSubmit={async (input) => {
+            if (!wallet.address) {
+              const msg = wallet.error ?? "先连接你的 Monad 测试网钱包。第三方悬赏要用这个地址核对链上付款。";
+              setFlash(msg);
+              return msg;
+            }
             setBusy(true);
-            const res = await createBounty(input);
+            const res = await createBounty({ ...input, buyerAddress: wallet.address });
             setBusy(false);
             if (!res.ok) {
               setFlash(res.error ?? "发布失败");
@@ -145,10 +153,12 @@ const DAY_MS = 86_400_000;
 
 function BountyForm({
   busy,
+  payer,
   onCancel,
   onSubmit,
 }: {
   busy: boolean;
+  payer: string | null;
   onCancel: () => void;
   onSubmit: (input: {
     kind: "data_brief" | "spread_watch";
@@ -191,8 +201,15 @@ function BountyForm({
   };
 
   return (
-    <Card title="发布悬赏" desc="任何人都可以发布；Agent 会按期望收益决定是否接单">
+    <Card title="发布悬赏" desc="第三方悬赏绑定当前连接的钱包，验收后按这个地址核对链上付款">
       <div className="stack" style={{ gap: 14 }}>
+        <div className="notice">
+          <span>
+            {payer
+              ? `付款核对地址：${payer}`
+              : "还没有连接钱包。发布前请先在顶栏连接，第三方悬赏必须带上你的地址。"}
+          </span>
+        </div>
         <div className="grid grid-2" style={{ gap: 12 }}>
           <label className="field">
             <span className="field-label">任务类型</span>

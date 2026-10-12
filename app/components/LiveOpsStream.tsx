@@ -13,7 +13,7 @@ const STATUS_OP: Record<string, { op: string; cls: string }> = {
   SUCCESS: { op: "SETTLE", cls: "set" },
   PENDING: { op: "DELIVER", cls: "pend" },
   FAILED: { op: "FAIL", cls: "fail" },
-  INTERCEPTED: { op: "GATE✗", cls: "itcp" },
+  INTERCEPTED: { op: "GATE", cls: "itcp" },
   SKIPPED: { op: "SKIP", cls: "skip" },
 };
 

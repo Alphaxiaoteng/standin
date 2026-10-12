@@ -97,6 +97,14 @@ export function IconCheck(props: IconProps) {
   );
 }
 
+export function IconCross(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M7 7l10 10M17 7 7 17" />
+    </svg>
+  );
+}
+
 export function IconExternal(props: IconProps) {
   return (
     <svg {...base(props)}>
@@ -129,6 +137,16 @@ export function IconAlert(props: IconProps) {
       <path d="M12 4.5 21 19H3l9-14.5Z" />
       <path d="M12 10v3.5" />
       <path d="M12 16.5h.01" />
+    </svg>
+  );
+}
+
+export function IconLink(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M9.2 14.8 14.8 9.2" />
+      <path d="M8 11.4 6.3 13.1a3.2 3.2 0 0 0 4.6 4.6l1.7-1.7" />
+      <path d="m16 12.6 1.7-1.7a3.2 3.2 0 0 0-4.6-4.6L11.4 8" />
     </svg>
   );
 }

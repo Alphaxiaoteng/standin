@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { runScenario, isScenarioKind } from "./runtime";
 import {
+  creditBalance,
   getStats,
   getLatestRehearsal,
   listIntercepts,
@@ -20,6 +21,7 @@ beforeEach(() => {
 
 describe('runtime - runScenario("allowed")', () => {
   it("返回 EXECUTED 并产生一条交易", () => {
+    creditBalance(20);
     const txBefore = listTransactions().length;
     const statsBefore = getStats();
 
@@ -167,6 +169,7 @@ describe('runtime - runScenario("infinite")', () => {
 
 describe("runtime - 重复运行累计 stats", () => {
   it("连续三次放行：支出累加 1.5 USDC、余额同步扣减、产生三条交易", () => {
+    creditBalance(20);
     const before = getStats();
     const txBefore = listTransactions().length;
 
@@ -194,6 +197,7 @@ describe("runtime - 重复运行累计 stats", () => {
   });
 
   it("混合运行后统计与流水/拦截条数保持一致", () => {
+    creditBalance(20);
     const before = getStats();
     const itBefore = listIntercepts().length;
     const txBefore = listTransactions().length;

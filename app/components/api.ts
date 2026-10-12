@@ -406,12 +406,16 @@ export async function createBounty(input: {
   toleranceBps?: number;
   buyerType?: "demo" | "third_party";
   buyerName?: string;
+  buyerAddress?: string;
 }): Promise<ApiResult<Bounty>> {
   try {
-    const raw = await getJSON("/api/bounties", {
+    const res = await fetch("/api/bounties", {
       method: "POST",
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     });
+    const raw: unknown = await res.json().catch(() => null);
     if (!raw || typeof raw !== "object") {
       return { ok: false, data: null, error: "发布悬赏失败，后端未响应" };
     }

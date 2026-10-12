@@ -21,6 +21,8 @@ import LiveOpsStream from "./components/LiveOpsStream";
 import PageHead from "./components/PageHead";
 import { formatAmount } from "./components/format";
 import { IconShield, IconWallet, IconActivity } from "./components/icons";
+import Mark from "./components/Mark";
+import { useWallet } from "./components/WalletProvider";
 
 const USDC_MONAD = "0x534b2f3A21130d7a60830c2Df862319e593943A3";
 
@@ -32,6 +34,7 @@ export default function Home() {
   const [activeTaskLabel, setActiveTaskLabel] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [openSource, setOpenSource] = useState<"net" | "balance" | "avoided" | "demo" | null>(null);
+  const wallet = useWallet();
 
   const reload = () => {
     void fetchStats().then(setStats);
@@ -63,7 +66,7 @@ export default function Home() {
   };
 
   const onchainNet = report?.onchainUsdcToday ?? 0;
-  const balance = stats?.walletBalance ?? 0;
+  const balance = wallet.address && wallet.usdc !== null ? wallet.usdc : null;
   const avoidedLoss = report?.avoidedLossUsdc ?? 0;
   const demoRevenue = report?.demoUsdc ?? 0;
   const todayCost = report?.todayCostUsdc ?? 0;
@@ -124,7 +127,7 @@ export default function Home() {
             <IconWallet size={12} /> 可动用本金
           </span>
           <span className="summary-value">
-            {formatAmount(balance)}
+            {balance === null ? "—" : formatAmount(balance)}
             <em>USDC</em>
           </span>
         </button>
@@ -194,11 +197,13 @@ export default function Home() {
       )}
       {openSource === "balance" && (
         <div className="notice">
-          <div className="card-title">来源：本地账本余额</div>
+          <div className="card-title">来源：已连接钱包的测试网 USDC</div>
           <div style={{ fontSize: 12.5, marginTop: 6 }}>
-            ledger.json stats.walletBalance（Monad 测试网 · 演示规模）。每笔成本扣减与
-            {report && report.onchainTxs.length > 0 ? " 链上确认收入入账" : " 演示结算"}都会更新，
-            流水见 <Link href="/transactions">账本页</Link>。
+            {wallet.address
+              ? `地址 ${wallet.address} 在 Monad 测试网（10143）上的 USDC 余额，直接读链，不含账本种子。`
+              : "还没有连接钱包。点顶栏「连接钱包」，用你自己的 Monad 测试网地址。未连接时这里不显示数字。"}
+            {wallet.address && !wallet.chainOk ? " 当前钱包不在 Monad 测试网，发交易前请点「切到 Monad」。" : ""}
+            {wallet.error ? ` ${wallet.error}` : ""}
           </div>
         </div>
       )}
@@ -250,7 +255,7 @@ export default function Home() {
           {healthEntries.map(([name, v]) => (
             <span key={name} className="src-chip" style={{ color: v.healthy ? "var(--green)" : "var(--red)" }}>
               {name}
-              {v.healthy ? "✓" : "✗"}
+              <Mark ok={v.healthy} />
               <em>{v.score.toFixed(2)}</em>
             </span>
           ))}

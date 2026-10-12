@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
+import { WalletProvider } from "./components/WalletProvider";
 
 export const metadata: Metadata = {
   title: "StandIn · Agent 支付护栏控制台",
@@ -15,6 +16,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body>
+        <WalletProvider>
         <div className="app-shell">
           <Sidebar />
           <div className="main-col">
@@ -32,6 +34,7 @@ export default function RootLayout({
             </footer>
           </div>
         </div>
+        </WalletProvider>
       </body>
     </html>
   );

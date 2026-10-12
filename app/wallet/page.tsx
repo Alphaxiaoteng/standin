@@ -12,13 +12,14 @@ import PageHead from "../components/PageHead";
 import {
   createPolicy,
   fetchPolicies,
-  fetchStats,
   revokePolicy,
 } from "../components/api";
-import type { Policy, Stats } from "../components/types";
+import type { Policy } from "../components/types";
 import { formatAmount, formatExpiry, isExpired } from "../components/format";
-import { Badge, Card, DataState, DataTable, Hash, Loading } from "../components/ui";
-import { IconPlus } from "../components/icons";
+import { Badge, Card, DataState, DataTable, Hash } from "../components/ui";
+import { IconAlert, IconLink, IconPlus, IconWallet } from "../components/icons";
+import { useWallet } from "../components/WalletProvider";
+import { EXPLORER } from "@/lib/chain";
 
 function ConfLine({ k, v, tone }: { k: string; v: string; tone?: string }) {
   return (
@@ -34,14 +35,12 @@ function ConfLine({ k, v, tone }: { k: string; v: string; tone?: string }) {
 }
 
 export default function WalletPage() {
-  const [stats, setStats] = useState<Stats | null>(null);
   const [policies, setPolicies] = useState<Policy[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
 
   const load = useCallback(() => {
-    fetchStats().then(setStats);
     fetchPolicies().then(setPolicies);
   }, []);
 
@@ -104,23 +103,8 @@ export default function WalletPage() {
       )}
 
       <div className="grid grid-3">
-        <Card title="本金读数" desc="Agent 可支配余额（本地账本，演示规模）">
-          {stats === null ? (
-            <Loading rows={2} />
-          ) : (
-            <div className="stack" style={{ gap: 10 }}>
-              <div className="metric-value is-accent" style={{ fontSize: 40, letterSpacing: "-0.01em" }}>
-                {formatAmount(stats.walletBalance)}
-                <span className="metric-unit">USDC</span>
-              </div>
-              <ConfLine k="spent_today" v={`${formatAmount(stats.todaySpent)} USDC`} />
-              <ConfLine
-                k="gates_intercepted"
-                v={`${stats.interceptCount} 次`}
-                tone="var(--green)"
-              />
-            </div>
-          )}
+        <Card title="链上本金" desc="你的钱包在 Monad 测试网上的余额，直接读链">
+          <ChainBalance />
         </Card>
 
         <Card title="guard.conf" desc="止损与仓位——在 Agent 之外强制执行">
@@ -211,6 +195,97 @@ export default function WalletPage() {
 
 const DAY_MS = 86_400_000;
 
+function ChainBalance() {
+  const wallet = useWallet();
+  const busy = wallet.phase === "connecting" || wallet.phase === "switching" || wallet.phase === "reading";
+
+  if (!wallet.address) {
+    return (
+      <div className="stack" style={{ gap: 12 }}>
+        <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.6 }}>
+          {wallet.hasProvider
+            ? "连接后这里显示你地址上的测试 USDC 和 MON。没有预置余额。"
+            : "这个浏览器里没有注入钱包。安装 MetaMask 后刷新再连接。"}
+        </div>
+        {wallet.error && (
+          <div className="notice" style={{ borderLeftColor: "var(--red)" }}>
+            <span>{wallet.error}</span>
+          </div>
+        )}
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={busy || (!wallet.hasProvider && wallet.phase === "error")}
+          onClick={() => void wallet.connect()}
+        >
+          <IconLink size={13} />
+          {wallet.phase === "connecting" ? "连接中…" : "连接钱包"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="stack" style={{ gap: 10 }}>
+      <div className="metric-value is-accent" style={{ fontSize: 40, letterSpacing: "-0.01em" }}>
+        {wallet.phase === "reading" || wallet.usdc === null ? "—" : formatAmount(wallet.usdc)}
+        <span className="metric-unit">USDC</span>
+      </div>
+      <ConfLine
+        k="address"
+        v={wallet.address}
+      />
+      <ConfLine
+        k="mon"
+        v={wallet.mon === null ? "读取中" : `${wallet.mon.toFixed(4)} MON`}
+      />
+      <ConfLine
+        k="chain"
+        v={wallet.chainOk ? "Monad Testnet · 10143" : `当前链 ${wallet.chainId ?? "未知"}，需要 10143`}
+        tone={wallet.chainOk ? "var(--green)" : "var(--amber)"}
+      />
+      {wallet.phase === "reading" && <ConfLine k="status" v="正在读取余额…" />}
+      {wallet.phase === "switching" && <ConfLine k="status" v="正在切换网络…" tone="var(--amber)" />}
+      {wallet.error && (
+        <div className="notice" style={{ borderLeftColor: "var(--red)" }}>
+          <IconAlert size={13} />
+          <span>{wallet.error}</span>
+        </div>
+      )}
+      <div className="row" style={{ gap: 8 }}>
+        {!wallet.chainOk && (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={busy}
+            onClick={() => void wallet.switchChain()}
+          >
+            <IconAlert size={13} />
+            {wallet.phase === "switching" ? "切链中…" : "切到 Monad 测试网"}
+          </button>
+        )}
+        <button
+          type="button"
+          className="btn btn-sm"
+          disabled={busy}
+          onClick={() => void wallet.refresh()}
+        >
+          <IconWallet size={13} />
+          {wallet.phase === "reading" ? "读取中…" : "刷新余额"}
+        </button>
+        <a
+          className="btn btn-sm btn-ghost"
+          href={`${EXPLORER}/address/${wallet.address}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          在浏览器查看
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function PolicyForm({
   onCancel,
   onSubmit,
@@ -226,12 +301,17 @@ function PolicyForm({
   }) => Promise<string | null>;
   onError: (message: string) => void;
 }) {
-  const [agent, setAgent] = useState("0xAgent_ERC8004_Identity_Bound");
+  const wallet = useWallet();
+  const [agent, setAgent] = useState("");
   const [merchantHash, setMerchantHash] = useState("");
   const [maxPerTx, setMaxPerTx] = useState("5");
   const [maxPerWeek, setMaxPerWeek] = useState("50");
   const [days, setDays] = useState("30");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (wallet.address) setAgent((cur) => (cur ? cur : wallet.address!));
+  }, [wallet.address]);
 
   const submit = async () => {
     setSaving(true);

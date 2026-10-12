@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import ChainStatus from "./ChainStatus";
+import WalletConnect from "./WalletConnect";
 import { NAV } from "./nav";
 
 export default function Topbar() {
@@ -25,6 +26,7 @@ export default function Topbar() {
       </div>
       <div className="topbar-right">
         <ChainStatus />
+        <WalletConnect />
         <span className="network-pill">{path}</span>
       </div>
     </header>

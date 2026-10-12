@@ -24,6 +24,7 @@ export default function OpportunitiesPage() {
   const [board, setBoard] = useState<OpportunityBoard | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<SopRunOutcome | null>(null);
+  const [settlementNote, setSettlementNote] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     void fetchOpportunityBoard().then(setBoard);
@@ -37,6 +38,11 @@ export default function OpportunitiesPage() {
     setBusy(o.id);
     const res = await runSopTask({ bountyId: o.bountyId ?? o.id });
     setOutcome(res);
+    setSettlementNote(
+      o.buyerType === "demo"
+        ? "DEMO BUYER 本地结算，不是链上转账。测试网测试币没有价值。"
+        : "第三方悬赏只有链上付款回执才算确认收入。没有回执的数字只是本地记账。",
+    );
     setBusy(null);
     reload();
   };
@@ -140,6 +146,7 @@ export default function OpportunitiesPage() {
               <div className="muted" style={{ fontSize: 12 }}>
                 成本 {formatAmount(outcome.task.costUsdc)} · 收入{" "}
                 {formatAmount(outcome.task.revenueUsdc)} USDC
+                {settlementNote ? ` · ${settlementNote}` : ""}
               </div>
               <span className="spacer" />
               <button

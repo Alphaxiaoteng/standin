@@ -43,7 +43,7 @@ export default function MetricsRow({ refreshKey = 0 }: { refreshKey?: number }) 
         value={offline ? "—" : formatAmount(stats.walletBalance)}
         unit="USDC"
         tone="accent"
-        foot={offline ? "指标接口未返回数据" : "Agent 可支配余额"}
+        foot={offline ? "指标接口未返回数据" : "本地账本记账，不是链上钱包余额"}
       />
     </div>
   );

@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import PageHead from "../components/PageHead";
 import { fetchLedgerEntries, type LedgerTaskEntry } from "../components/api";
 import { formatAmount, formatTime } from "../components/format";
+import Mark from "../components/Mark";
 import { Badge, Card, DataState } from "../components/ui";
 
 const STATUS_TONE: Record<string, "success" | "danger" | "warn" | "neutral"> = {
@@ -99,7 +100,7 @@ function TaskRow({ e }: { e: LedgerTaskEntry }) {
               <div className="stack" style={{ gap: 3 }}>
                 {e.verifyChecks.map((c, i) => (
                   <span key={i} style={{ fontSize: 12, color: c.passed ? "var(--text)" : "var(--red)" }}>
-                    {c.passed ? "✓" : "✗"} {c.label}
+                    <Mark ok={c.passed} /> {c.label}
                   </span>
                 ))}
               </div>
@@ -128,15 +129,15 @@ function TaskRow({ e }: { e: LedgerTaskEntry }) {
           {e.txHash && (
             <>
               <div className="card-title" style={{ margin: "10px 0 6px" }}>
-                链上证据
+                {e.explorerUrl ? "链上交易" : "本地流水号"}
               </div>
               <span className="mono" style={{ fontSize: 11.5, wordBreak: "break-all" }}>
-                交易 {e.txHash}
+                {e.explorerUrl ? "交易" : "本地流水号（不是链上交易）"} {e.txHash}
                 {e.explorerUrl && (
                   <>
                     {" · "}
                     <a href={e.explorerUrl} target="_blank" rel="noreferrer">
-                      在区块浏览器查看 ↗
+                      在区块浏览器查看
                     </a>
                   </>
                 )}

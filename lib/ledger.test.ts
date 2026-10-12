@@ -54,6 +54,7 @@ describe("Ledger - 账本存盘与模拟崩溃重启恢复", () => {
     // 1. 初始化一个独立落盘的 Ledger 实例
     const ledgerBeforeCrash = new Ledger({ storagePath: CRASH_TEST_DB });
     expect(ledgerBeforeCrash.isOpen()).toBe(true);
+    ledgerBeforeCrash.creditBalance(100);
 
     const initialBalance = ledgerBeforeCrash.getStats().walletBalance;
 
@@ -179,6 +180,7 @@ describe("Ledger - 回滚机制与写失败停机 (PRD §三/§四)", () => {
 
   it("withRollback 事务包裹：若业务逻辑抛出异常，状态自动还原", () => {
     const ledger = new Ledger({ storagePath: ROLLBACK_TEST_DB });
+    ledger.creditBalance(100);
     const initialBalance = ledger.getStats().walletBalance;
 
     expect(() => {
@@ -244,6 +246,7 @@ describe("Ledger - 默认单例与 API 接口契约", () => {
   });
 
   it("addCost 与 addRevenue 正确联动金库余额", () => {
+    creditBalance(20);
     const before = getStats();
     addCost(1.5, { taskId: "task-cost-1", description: "调用 API 消耗" });
     const mid = getStats();
